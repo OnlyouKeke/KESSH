@@ -1,0 +1,11 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/HistoryPage",
+    "pages/SSHNewPage",
+    "pages/SettingsPage",
+    "pages/Terminal",
+    "pages/SettingsKeys",
+    "pages/SettingsLogs"
+  ]
+}

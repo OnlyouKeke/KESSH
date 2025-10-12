@@ -1,0 +1,20 @@
+{
+  "appSelected": {
+    "appId": "6917586480555789631",
+    "appName": "KESSH",
+    "deviceTypes": [
+      {
+        "appAdapters": "5",
+        "deviceType": 4
+      }
+    ],
+    "enableSites": "CN",
+    "installationFree": 0,
+    "packageType": 7,
+    "projectId": "461323198430459545",
+    "projectName": "华为开发者激励",
+    "siteId": "CN"
+  },
+  "teamId": "2850086000399314158",
+  "uid": "2850086000399314158"
+}

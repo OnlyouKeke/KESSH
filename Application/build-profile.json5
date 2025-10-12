@@ -1,0 +1,60 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "storeFile": "E:/KESSH/KESSH.p12",
+          "storePassword": "00000018BF517F242A08FB674C705C4CC8DF699E73822D290B106478F4EC5B35A34281AB00EDA8AA",
+          "keyAlias": "keke",
+          "keyPassword": "000000181077EB397B1CA65A89923414AA33CFF4BE3B91C51C4CA30A4A8B86D3D072077E868D3850",
+          "signAlg": "SHA256withECDSA",
+          "profile": "E:/KESSH/KESSHRelease.p7b",
+          "certpath": "E:/KESSH/KESSH.cer"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "targetSdkVersion": "6.0.0(20)",
+        "compatibleSdkVersion": "5.1.0(18)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cloud_objects",
+      "srcPath": "./cloud_objects"
+    }
+  ]
+}
