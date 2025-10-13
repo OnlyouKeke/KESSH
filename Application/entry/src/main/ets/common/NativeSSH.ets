@@ -22,7 +22,7 @@ try {
   Logger.log('原生SSH: 已加载 N-API 模块');
 } catch (e) {
   nativeBinding = null;
-  Logger.log('原生SSH: 未检测到 N-API 模块，使用占位实现');
+  Logger.log('原生SSH: 未检测到 N-API 模块');
 }
 
 export class SSHEngine {
@@ -31,8 +31,8 @@ export class SSHEngine {
       const ok = nativeBinding.connectPassword(host, port, username, password);
       return ok ? true : false;
     }
-    Logger.log(`原生SSH(密码-占位): 连接到 ${username}@${host}:${port}`);
-    return true;
+    Logger.log(`原生SSH: 未启用原生模块，无法进行密码方式连接 ${username}@${host}:${port}`);
+    return false;
   }
 
   static async connectKey(host: string, port: number, username: string, privateKey: string, passphrase?: string): Promise<boolean> {
@@ -40,8 +40,8 @@ export class SSHEngine {
       const ok = nativeBinding.connectKey(host, port, username, privateKey, passphrase);
       return ok ? true : false;
     }
-    Logger.log(`原生SSH(密钥-占位): 连接到 ${username}@${host}:${port} 使用密钥`);
-    return true;
+    Logger.log(`原生SSH: 未启用原生模块，无法进行密钥方式连接 ${username}@${host}:${port}`);
+    return false;
   }
 
   static async connectKey2(host: string, port: number, username: string, privateKey: string, publicKey: string, passphrase?: string): Promise<boolean> {
@@ -49,57 +49,53 @@ export class SSHEngine {
       const ok = nativeBinding.connectKey2(host, port, username, privateKey, publicKey, passphrase);
       return ok ? true : false;
     }
-    Logger.log(`原生SSH(密钥2-占位): 连接到 ${username}@${host}:${port} 使用密钥对`);
-    return true;
+    Logger.log(`原生SSH: 未启用原生模块，无法进行密钥对方式连接 ${username}@${host}:${port}`);
+    return false;
   }
 
   static execCommandPassword(host: string, port: number, username: string, password: string, command: string): string {
     if (nativeBinding && nativeBinding.execCommandPassword) {
       return nativeBinding.execCommandPassword(host, port, username, password, command);
     }
-    Logger.log(`原生SSH(命令-密码-占位): 在 ${username}@${host}:${port} 执行 ${command}`);
-    return `占位输出: ${command}`;
+    Logger.log(`原生SSH: 未启用原生模块，无法执行命令(密码) ${username}@${host}:${port} -> ${command}`);
+    return '';
   }
 
   static execCommandKey(host: string, port: number, username: string, privateKey: string, publicKey: string, passphrase: string | undefined, command: string): string {
     if (nativeBinding && nativeBinding.execCommandKey) {
       return nativeBinding.execCommandKey(host, port, username, privateKey, publicKey, passphrase, command);
     }
-    Logger.log(`原生SSH(命令-密钥-占位): 在 ${username}@${host}:${port} 执行 ${command}`);
-    return `占位输出: ${command}`;
+    Logger.log(`原生SSH: 未启用原生模块，无法执行命令(密钥) ${username}@${host}:${port} -> ${command}`);
+    return '';
   }
 
   static openSessionPassword(host: string, port: number, username: string, password: string): number {
     if (nativeBinding && nativeBinding.openSessionPassword) {
       return nativeBinding.openSessionPassword(host, port, username, password);
     }
-    Logger.log(`原生SSH(会话-密码-占位): 打开到 ${username}@${host}:${port} 的会话`);
-    return Math.floor(Math.random() * 1000) + 1; // 返回随机会话ID
+    Logger.log(`原生SSH: 未启用原生模块，无法打开会话(密码) ${username}@${host}:${port}`);
+    return -1;
   }
 
   static openSessionKey2(host: string, port: number, username: string, privateKey: string, publicKey: string, passphrase?: string): number {
     if (nativeBinding && nativeBinding.openSessionKey2) {
       return nativeBinding.openSessionKey2(host, port, username, privateKey, publicKey, passphrase);
     }
-    Logger.log(`原生SSH(会话-密钥-占位): 打开到 ${username}@${host}:${port} 的会话`);
-    return Math.floor(Math.random() * 1000) + 1; // 返回随机会话ID
+    Logger.log(`原生SSH: 未启用原生模块，无法打开会话(密钥) ${username}@${host}:${port}`);
+    return -1;
   }
 
   static termWrite(sessionId: number, data: string): boolean {
     if (nativeBinding && nativeBinding.termWrite) {
       return nativeBinding.termWrite(sessionId, data);
     }
-    Logger.log(`原生SSH(终端写-占位): 会话 ${sessionId} 写入 ${data}`);
-    return true;
+    Logger.log(`原生SSH: 未启用原生模块，无法写入终端 会话=${sessionId}`);
+    return false;
   }
 
   static termRead(sessionId: number): string {
     if (nativeBinding && nativeBinding.termRead) {
       return nativeBinding.termRead(sessionId);
-    }
-    // 占位实现：返回随机输出
-    if (Math.random() < 0.1) {
-      return `$ 占位输出 ${new Date().getTime()}`;
     }
     return '';
   }
@@ -109,6 +105,6 @@ export class SSHEngine {
       nativeBinding.termClose(sessionId);
       return;
     }
-    Logger.log(`原生SSH(终端关闭-占位): 关闭会话 ${sessionId}`);
   }
 }
+

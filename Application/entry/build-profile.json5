@@ -5,6 +5,17 @@
       "copyCodeResource": {
         "enable": false
       }
+    },
+    "externalNativeOptions": {
+      "path": "./src/main/cpp/CMakeLists.txt",
+      "abiFilters": ["arm64-v8a", "x86_64"],
+      "arguments": [
+        "-DLIBSSH2_INCLUDE_DIR_ARM64=E:/KESSH/libssh2-out/arm64-v8a/include",
+        "-DLIBSSH2_LIBRARY_ARM64=E:/KESSH/libssh2-out/arm64-v8a/lib/libssh2.a;E:/KESSH/mbedtls-out/arm64-v8a/lib/libmbedtls.a;E:/KESSH/mbedtls-out/arm64-v8a/lib/libmbedx509.a;E:/KESSH/mbedtls-out/arm64-v8a/lib/libmbedcrypto.a",
+        "-DLIBSSH2_INCLUDE_DIR_X64=E:/KESSH/libssh2-out/x86_64/include",
+        "-DLIBSSH2_LIBRARY_X64=E:/KESSH/libssh2-out/x86_64/lib/libssh2.a;E:/KESSH/mbedtls-out/x86_64/lib/libmbedtls.a;E:/KESSH/mbedtls-out/x86_64/lib/libmbedx509.a;E:/KESSH/mbedtls-out/x86_64/lib/libmbedcrypto.a"
+      ],
+      "cppFlags": "-std=c++17"
     }
   },
   "buildOptionSet": [
