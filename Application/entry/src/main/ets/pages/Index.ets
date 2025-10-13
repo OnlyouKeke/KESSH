@@ -19,7 +19,7 @@ struct Index {
       // 内容区：底部 Tab
       Tabs({ index: this.currentIndex }) {
         TabContent() {
-          HistoryPage({ currentIndex: $currentIndex })
+          HistoryPage({ currentIndex: this.currentIndex })
         }
         .tabBar({ text: '首页' })
 
