@@ -1,4 +1,4 @@
-// Minimal SSH N-API bridge for HarmonyOS using libssh2
+// Minimal SSH N-API bridge for HarmonyOS using libssh
 #pragma once
 
 #include <napi/native_api.h>
