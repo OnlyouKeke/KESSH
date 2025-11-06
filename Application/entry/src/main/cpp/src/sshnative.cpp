@@ -1,6 +1,7 @@
-// HarmonyOS N-API SSH bridge implemented with libssh and OpenSSL
 #include <napi/native_api.h>
 #include <js_native_api.h>
+
+#include <libssh2.h>
 
 #include <string>
 #include <vector>
@@ -9,194 +10,357 @@
 #include <atomic>
 #include <algorithm>
 
-#include <libssh/libssh.h>
-#include <libssh/callbacks.h>
+#include <cerrno>
+#include <cstring>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+using socket_t = SOCKET;
+#else
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+using socket_t = int;
+#endif
+
+namespace {
 
 struct SSHSession {
-    ssh_session session{nullptr};
-    ssh_channel channel{nullptr};
+    LIBSSH2_SESSION* session{nullptr};
+    LIBSSH2_CHANNEL* channel{nullptr};
+    socket_t sock{-1};
 };
 
 static std::atomic<int> g_next_id{1};
 static std::mutex g_mutex;
 static std::map<int, SSHSession*> g_sessions;
 
-static ssh_session create_session(const std::string& host, int port, const std::string& user)
+static std::mutex g_init_mutex;
+static bool g_libssh2_ready = false;
+
+#ifdef _WIN32
+static void close_socket(socket_t sock)
 {
-    ssh_session session = ssh_new();
-    if (!session) {
-        return nullptr;
+    if (sock != INVALID_SOCKET) {
+        closesocket(sock);
     }
-    ssh_options_set(session, SSH_OPTIONS_HOST, host.c_str());
-    ssh_options_set(session, SSH_OPTIONS_PORT, &port);
-    ssh_options_set(session, SSH_OPTIONS_USER, user.c_str());
-    int strict = SSH_STRICTHOSTKEYCHECK_NO;
-    ssh_options_set(session, SSH_OPTIONS_STRICTHOSTKEYCHECK, &strict);
-    ssh_set_blocking(session, 1);
-    return session;
+}
+#else
+static void close_socket(socket_t sock)
+{
+    if (sock >= 0) {
+        close(sock);
+    }
+}
+#endif
+
+static bool ensure_lib_init()
+{
+    std::lock_guard<std::mutex> lock(g_init_mutex);
+    if (g_libssh2_ready) {
+        return true;
+    }
+#ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        return false;
+    }
+#endif
+    if (libssh2_init(0) != 0) {
+        return false;
+    }
+    g_libssh2_ready = true;
+    return true;
 }
 
-static bool authenticate(ssh_session session, const std::string& user,
-                         const std::string* password,
-                         const std::string* privKey,
-                         const std::string* passphrase)
+static socket_t connect_socket(const std::string& host, int port)
 {
-    if (ssh_connect(session) != SSH_OK) {
-        return false;
+    struct addrinfo hints;
+    std::memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    std::string port_str = std::to_string(port);
+    struct addrinfo* res = nullptr;
+    if (getaddrinfo(host.c_str(), port_str.c_str(), &hints, &res) != 0) {
+        return static_cast<socket_t>(-1);
     }
 
-    if (password) {
-        if (ssh_userauth_password(session, user.c_str(), password->c_str()) == SSH_OK) {
-            return true;
+    socket_t sock = static_cast<socket_t>(-1);
+    for (struct addrinfo* p = res; p; p = p->ai_next) {
+        socket_t s = static_cast<socket_t>(::socket(p->ai_family, p->ai_socktype, p->ai_protocol));
+#ifdef _WIN32
+        if (s == INVALID_SOCKET) {
+            continue;
         }
-        return false;
+#else
+        if (s < 0) {
+            continue;
+        }
+#endif
+        if (::connect(s, p->ai_addr, static_cast<int>(p->ai_addrlen)) == 0) {
+            sock = s;
+            break;
+        }
+        close_socket(s);
+    }
+
+    freeaddrinfo(res);
+    return sock;
+}
+
+static void destroy_session(SSHSession* session)
+{
+    if (!session) {
+        return;
+    }
+
+    if (session->channel) {
+        libssh2_channel_send_eof(session->channel);
+        libssh2_channel_close(session->channel);
+        libssh2_channel_free(session->channel);
+        session->channel = nullptr;
+    }
+
+    if (session->session) {
+        libssh2_session_disconnect(session->session, "Normal shutdown");
+        libssh2_session_free(session->session);
+        session->session = nullptr;
+    }
+
+    if (session->sock != static_cast<socket_t>(-1)) {
+        close_socket(session->sock);
+        session->sock = static_cast<socket_t>(-1);
+    }
+
+    delete session;
+}
+
+static bool authenticate(LIBSSH2_SESSION* session,
+                         const std::string& user,
+                         const std::string* password,
+                         const std::string* privKey,
+                         const std::string* pubKey,
+                         const std::string* passphrase)
+{
+    if (password && !password->empty()) {
+        int rc = libssh2_userauth_password(session, user.c_str(), password->c_str());
+        return rc == 0;
     }
 
     if (privKey) {
-        ssh_key key = nullptr;
-        int rc = ssh_pki_import_privkey_mem(privKey->c_str(), privKey->size(),
-                                            passphrase ? passphrase->c_str() : nullptr,
-                                            nullptr, nullptr, &key);
-        if (rc != SSH_OK) {
-            return false;
+        const char* pub_ptr = nullptr;
+        size_t pub_len = 0;
+        if (pubKey && !pubKey->empty()) {
+            pub_ptr = pubKey->c_str();
+            pub_len = pubKey->size();
         }
-        rc = ssh_userauth_publickey(session, user.c_str(), key);
-        ssh_key_free(key);
-        return rc == SSH_OK;
+        const char* pass = (passphrase && !passphrase->empty()) ? passphrase->c_str() : nullptr;
+        int rc = libssh2_userauth_publickey_frommemory(session,
+                                                       user.c_str(),
+                                                       user.size(),
+                                                       pub_ptr,
+                                                       pub_len,
+                                                       privKey->c_str(),
+                                                       privKey->size(),
+                                                       pass);
+        return rc == 0;
     }
 
     return false;
 }
 
-static void destroy_session(ssh_session session)
+static bool create_authenticated_session(const std::string& host,
+                                         int port,
+                                         const std::string& user,
+                                         const std::string* password,
+                                         const std::string* privKey,
+                                         const std::string* pubKey,
+                                         const std::string* passphrase,
+                                         LIBSSH2_SESSION** out_session,
+                                         socket_t* out_sock)
 {
-    if (!session) {
-        return;
+    if (!ensure_lib_init()) {
+        return false;
     }
-    ssh_disconnect(session);
-    ssh_free(session);
+
+    socket_t sock = connect_socket(host, port);
+#ifdef _WIN32
+    if (sock == INVALID_SOCKET) {
+        return false;
+    }
+#else
+    if (sock < 0) {
+        return false;
+    }
+#endif
+
+    LIBSSH2_SESSION* session = libssh2_session_init();
+    if (!session) {
+        close_socket(sock);
+        return false;
+    }
+
+    libssh2_session_set_blocking(session, 1);
+
+    if (libssh2_session_handshake(session, sock) != 0) {
+        libssh2_session_free(session);
+        close_socket(sock);
+        return false;
+    }
+
+    if (!authenticate(session, user, password, privKey, pubKey, passphrase)) {
+        libssh2_session_disconnect(session, "Authentication failed");
+        libssh2_session_free(session);
+        close_socket(sock);
+        return false;
+    }
+
+    *out_session = session;
+    *out_sock = sock;
+    return true;
 }
 
-static SSHSession* open_shell_session(const std::string& host, int port,
+static SSHSession* open_shell_session(const std::string& host,
+                                      int port,
                                       const std::string& user,
                                       const std::string* password,
                                       const std::string* privKey,
+                                      const std::string* pubKey,
                                       const std::string* passphrase)
 {
-    ssh_session session = create_session(host, port, user);
-    if (!session) {
+    LIBSSH2_SESSION* session = nullptr;
+    socket_t sock = static_cast<socket_t>(-1);
+    if (!create_authenticated_session(host, port, user, password, privKey, pubKey, passphrase,
+                                      &session, &sock)) {
         return nullptr;
     }
 
-    if (!authenticate(session, user, password, privKey, passphrase)) {
-        destroy_session(session);
-        return nullptr;
-    }
-
-    ssh_channel channel = ssh_channel_new(session);
+    LIBSSH2_CHANNEL* channel = libssh2_channel_open_session(session);
     if (!channel) {
-        destroy_session(session);
+        libssh2_session_disconnect(session, "Failed to open channel");
+        libssh2_session_free(session);
+        close_socket(sock);
         return nullptr;
     }
 
-    if (ssh_channel_open_session(channel) != SSH_OK) {
-        ssh_channel_free(channel);
-        destroy_session(session);
+    if (libssh2_channel_request_pty(channel, "xterm") != 0) {
+        libssh2_channel_close(channel);
+        libssh2_channel_free(channel);
+        libssh2_session_disconnect(session, "Failed to request PTY");
+        libssh2_session_free(session);
+        close_socket(sock);
         return nullptr;
     }
 
-    if (ssh_channel_request_pty(channel) != SSH_OK) {
-        ssh_channel_close(channel);
-        ssh_channel_free(channel);
-        destroy_session(session);
+    if (libssh2_channel_shell(channel) != 0) {
+        libssh2_channel_close(channel);
+        libssh2_channel_free(channel);
+        libssh2_session_disconnect(session, "Failed to start shell");
+        libssh2_session_free(session);
+        close_socket(sock);
         return nullptr;
     }
 
-    if (ssh_channel_request_shell(channel) != SSH_OK) {
-        ssh_channel_close(channel);
-        ssh_channel_free(channel);
-        destroy_session(session);
-        return nullptr;
-    }
+    libssh2_session_set_blocking(session, 0);
+    libssh2_channel_set_blocking(channel, 0);
 
     SSHSession* s = new SSHSession();
     s->session = session;
     s->channel = channel;
+    s->sock = sock;
     return s;
 }
 
-static bool test_connect(const std::string& host, int port,
+static bool test_connect(const std::string& host,
+                         int port,
                          const std::string& user,
                          const std::string* password,
                          const std::string* privKey,
+                         const std::string* pubKey,
                          const std::string* passphrase)
 {
-    ssh_session session = create_session(host, port, user);
-    if (!session) {
+    LIBSSH2_SESSION* session = nullptr;
+    socket_t sock = static_cast<socket_t>(-1);
+    if (!create_authenticated_session(host, port, user, password, privKey, pubKey, passphrase,
+                                      &session, &sock)) {
         return false;
     }
-    bool ok = authenticate(session, user, password, privKey, passphrase);
-    destroy_session(session);
-    return ok;
+
+    libssh2_session_disconnect(session, "Test complete");
+    libssh2_session_free(session);
+    close_socket(sock);
+    return true;
 }
 
-static std::string execute_command(const std::string& host, int port,
+static std::string execute_command(const std::string& host,
+                                   int port,
                                    const std::string& user,
                                    const std::string* password,
                                    const std::string* privKey,
+                                   const std::string* pubKey,
                                    const std::string* passphrase,
                                    const std::string& command)
 {
-    ssh_session session = create_session(host, port, user);
-    if (!session) {
-        return std::string();
-    }
-
+    LIBSSH2_SESSION* session = nullptr;
+    socket_t sock = static_cast<socket_t>(-1);
     std::string output;
-    if (!authenticate(session, user, password, privKey, passphrase)) {
-        destroy_session(session);
+
+    if (!create_authenticated_session(host, port, user, password, privKey, pubKey, passphrase,
+                                      &session, &sock)) {
         return output;
     }
 
-    ssh_channel channel = ssh_channel_new(session);
+    LIBSSH2_CHANNEL* channel = libssh2_channel_open_session(session);
     if (!channel) {
-        destroy_session(session);
+        libssh2_session_disconnect(session, "Failed to open channel");
+        libssh2_session_free(session);
+        close_socket(sock);
         return output;
     }
 
-    if (ssh_channel_open_session(channel) != SSH_OK) {
-        ssh_channel_free(channel);
-        destroy_session(session);
-        return output;
-    }
-
-    if (ssh_channel_request_exec(channel, command.c_str()) != SSH_OK) {
-        ssh_channel_close(channel);
-        ssh_channel_free(channel);
-        destroy_session(session);
+    if (libssh2_channel_exec(channel, command.c_str()) != 0) {
+        libssh2_channel_close(channel);
+        libssh2_channel_free(channel);
+        libssh2_session_disconnect(session, "Failed to exec command");
+        libssh2_session_free(session);
+        close_socket(sock);
         return output;
     }
 
     char buffer[4096];
-    for (;;) {
-        int rc = ssh_channel_read_timeout(channel, buffer, sizeof(buffer), 0, 500);
-        if (rc == SSH_AGAIN) {
-            continue;
-        }
-        if (rc <= 0) {
+    while (true) {
+        ssize_t rc = libssh2_channel_read(channel, buffer, sizeof(buffer));
+        if (rc > 0) {
+            output.append(buffer, buffer + rc);
+        } else if (rc == LIBSSH2_ERROR_EAGAIN) {
+            // Wait briefly for more data
+            LIBSSH2_POLLFD pfd;
+            std::memset(&pfd, 0, sizeof(pfd));
+            pfd.type = LIBSSH2_POLLFD_CHANNEL;
+            pfd.fd.channel = channel;
+            pfd.events = LIBSSH2_POLLFD_POLLIN;
+            libssh2_poll(&pfd, 1, 100);
+        } else {
             break;
         }
-        output.append(buffer, buffer + rc);
     }
 
-    ssh_channel_send_eof(channel);
-    ssh_channel_close(channel);
-    ssh_channel_free(channel);
-    destroy_session(session);
+    libssh2_channel_send_eof(channel);
+    libssh2_channel_close(channel);
+    libssh2_channel_free(channel);
+    libssh2_session_disconnect(session, "Command complete");
+    libssh2_session_free(session);
+    close_socket(sock);
+
     return output;
 }
 
-// N-API helpers
 static std::string get_string(napi_env env, napi_value v)
 {
     size_t len = 0;
@@ -245,7 +409,7 @@ static napi_value ConnectPassword(napi_env env, napi_callback_info info)
     std::string user = get_string(env, argv[2]);
     std::string pass = argc >= 4 ? get_string(env, argv[3]) : std::string();
 
-    bool ok = test_connect(host, port, user, &pass, nullptr, nullptr);
+    bool ok = test_connect(host, port, user, &pass, nullptr, nullptr, nullptr);
     return boolean_of(env, ok);
 }
 
@@ -265,7 +429,7 @@ static napi_value ConnectKey(napi_env env, napi_callback_info info)
     std::string priv = get_string(env, argv[3]);
     std::string passphrase = argc >= 5 ? get_string(env, argv[4]) : std::string();
 
-    bool ok = test_connect(host, port, user, nullptr, &priv, &passphrase);
+    bool ok = test_connect(host, port, user, nullptr, &priv, nullptr, &passphrase);
     return boolean_of(env, ok);
 }
 
@@ -285,9 +449,8 @@ static napi_value ConnectKey2(napi_env env, napi_callback_info info)
     std::string priv = get_string(env, argv[3]);
     std::string pub = get_string(env, argv[4]);
     std::string passphrase = argc >= 6 ? get_string(env, argv[5]) : std::string();
-    // Public key parameter retained for API compatibility but unused with libssh memory import.
-    (void)pub;
-    bool ok = test_connect(host, port, user, nullptr, &priv, &passphrase);
+
+    bool ok = test_connect(host, port, user, nullptr, &priv, &pub, &passphrase);
     return boolean_of(env, ok);
 }
 
@@ -307,7 +470,7 @@ static napi_value ExecCommandPassword(napi_env env, napi_callback_info info)
     std::string pass = get_string(env, argv[3]);
     std::string cmd = get_string(env, argv[4]);
 
-    std::string out = execute_command(host, port, user, &pass, nullptr, nullptr, cmd);
+    std::string out = execute_command(host, port, user, &pass, nullptr, nullptr, nullptr, cmd);
     return string_of(env, out);
 }
 
@@ -329,8 +492,7 @@ static napi_value ExecCommandKey(napi_env env, napi_callback_info info)
     std::string passphrase = get_string(env, argv[5]);
     std::string cmd = argc >= 7 ? get_string(env, argv[6]) : std::string();
 
-    (void)pub;
-    std::string out = execute_command(host, port, user, nullptr, &priv, &passphrase, cmd);
+    std::string out = execute_command(host, port, user, nullptr, &priv, &pub, &passphrase, cmd);
     return string_of(env, out);
 }
 
@@ -349,7 +511,7 @@ static napi_value OpenSessionPassword(napi_env env, napi_callback_info info)
     std::string user = get_string(env, argv[2]);
     std::string pass = get_string(env, argv[3]);
 
-    SSHSession* s = open_shell_session(host, port, user, &pass, nullptr, nullptr);
+    SSHSession* s = open_shell_session(host, port, user, &pass, nullptr, nullptr, nullptr);
     if (!s) {
         return number_of(env, -1);
     }
@@ -377,8 +539,7 @@ static napi_value OpenSessionKey2(napi_env env, napi_callback_info info)
     std::string pub = get_string(env, argv[4]);
     std::string passphrase = argc >= 6 ? get_string(env, argv[5]) : std::string();
 
-    (void)pub;
-    SSHSession* s = open_shell_session(host, port, user, nullptr, &priv, &passphrase);
+    SSHSession* s = open_shell_session(host, port, user, nullptr, &priv, &pub, &passphrase);
     if (!s) {
         return number_of(env, -1);
     }
@@ -408,9 +569,28 @@ static napi_value TermWrite(napi_env env, napi_callback_info info)
         return boolean_of(env, false);
     }
 
-    ssh_channel channel = it->second->channel;
-    int written = ssh_channel_write(channel, data.c_str(), data.size());
-    return boolean_of(env, written >= 0);
+    LIBSSH2_CHANNEL* channel = it->second->channel;
+    size_t offset = 0;
+    while (offset < data.size()) {
+        ssize_t rc = libssh2_channel_write(channel,
+                                           data.data() + offset,
+                                           data.size() - offset);
+        if (rc == LIBSSH2_ERROR_EAGAIN) {
+            LIBSSH2_POLLFD pfd;
+            std::memset(&pfd, 0, sizeof(pfd));
+            pfd.type = LIBSSH2_POLLFD_CHANNEL;
+            pfd.fd.channel = channel;
+            pfd.events = LIBSSH2_POLLFD_POLLOUT;
+            libssh2_poll(&pfd, 1, 100);
+            continue;
+        }
+        if (rc < 0) {
+            return boolean_of(env, false);
+        }
+        offset += static_cast<size_t>(rc);
+    }
+
+    return boolean_of(env, true);
 }
 
 static napi_value TermRead(napi_env env, napi_callback_info info)
@@ -431,22 +611,20 @@ static napi_value TermRead(napi_env env, napi_callback_info info)
         return string_of(env, "");
     }
 
-    ssh_channel channel = it->second->channel;
+    LIBSSH2_CHANNEL* channel = it->second->channel;
     std::string out;
 
-    while (ssh_channel_is_open(channel) && !ssh_channel_is_eof(channel)) {
-        int available = ssh_channel_poll_timeout(channel, 0, 0);
-        if (available <= 0) {
+    while (libssh2_poll_channel_read(channel, 0) > 0) {
+        std::vector<char> buffer(4096);
+        ssize_t rc = libssh2_channel_read(channel, buffer.data(), buffer.size());
+        if (rc > 0) {
+            out.append(buffer.data(), static_cast<size_t>(rc));
+            if (rc < static_cast<ssize_t>(buffer.size())) {
+                break;
+            }
+        } else if (rc == LIBSSH2_ERROR_EAGAIN) {
             break;
-        }
-        int to_read = std::min(available, 4096);
-        std::vector<char> buffer(static_cast<size_t>(to_read));
-        int rc = ssh_channel_read(channel, buffer.data(), buffer.size(), 0);
-        if (rc <= 0) {
-            break;
-        }
-        out.append(buffer.data(), rc);
-        if (rc < to_read) {
+        } else {
             break;
         }
     }
@@ -476,22 +654,15 @@ static napi_value TermClose(napi_env env, napi_callback_info info)
         }
     }
 
-    if (session) {
-        if (session->channel) {
-            ssh_channel_send_eof(session->channel);
-            ssh_channel_close(session->channel);
-            ssh_channel_free(session->channel);
-        }
-        destroy_session(session->session);
-        delete session;
-    }
-
+    destroy_session(session);
     return nullptr;
 }
 
 static napi_value GetVersion(napi_env env, napi_callback_info info)
 {
-    ensure_lib_init();
+    if (!ensure_lib_init()) {
+        return string_of(env, "");
+    }
     const char* ver = libssh2_version(0);
     if (!ver) {
         return string_of(env, "");
@@ -521,6 +692,8 @@ static napi_value Init(napi_env env, napi_value exports)
     define_function(env, exports, "getVersion", GetVersion);
     return exports;
 }
+
+} // namespace
 
 extern "C" __attribute__((constructor)) void RegisterSshNative()
 {

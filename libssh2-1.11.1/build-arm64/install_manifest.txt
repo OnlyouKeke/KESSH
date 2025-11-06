@@ -10,7 +10,7 @@ E:/KESSH/libssh2-out/arm64-v8a/include/libssh2_publickey.h
 E:/KESSH/libssh2-out/arm64-v8a/include/libssh2_sftp.h
 E:/KESSH/libssh2-out/arm64-v8a/lib/libssh2.a
 E:/KESSH/libssh2-out/arm64-v8a/lib/cmake/libssh2/libssh2-targets.cmake
-E:/KESSH/libssh2-out/arm64-v8a/lib/cmake/libssh2/libssh2-targets-noconfig.cmake
+E:/KESSH/libssh2-out/arm64-v8a/lib/cmake/libssh2/libssh2-targets-release.cmake
 E:/KESSH/libssh2-out/arm64-v8a/lib/cmake/libssh2/libssh2-config.cmake
 E:/KESSH/libssh2-out/arm64-v8a/lib/cmake/libssh2/FindLibgcrypt.cmake
 E:/KESSH/libssh2-out/arm64-v8a/lib/cmake/libssh2/FindMbedTLS.cmake

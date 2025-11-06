@@ -10,9 +10,7 @@ include_directories(E:/KESSH/libssh2-out/x86_64/include)
 
 target_link_libraries(libssh2_smoke PRIVATE
   E:/KESSH/libssh2-out/x86_64/lib/libssh2.a
-  E:/KESSH/mbedtls-out/x86_64/lib/libmbedtls.a
-  E:/KESSH/mbedtls-out/x86_64/lib/libmbedx509.a
-  E:/KESSH/mbedtls-out/x86_64/lib/libmbedcrypto.a
+  E:/KESSH/wolfssl-out/x86_64/lib/libwolfssl.a
   dl
   pthread
 )
