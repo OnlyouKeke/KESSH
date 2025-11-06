@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Builds OpenSSL and libssh for HarmonyOS using the NDK toolchain.
+# Builds wolfSSL and libssh2 for HarmonyOS using the NDK toolchain.
 #
 # Environment variables:
-#   OHOS_NDK_HOME (required) - path to the HarmonyOS Native SDK.
+#   OHOS_NDK_HOME (required)  - path to the HarmonyOS Native SDK.
 #   OHOS_API_LEVEL (optional) - target API level (default: 11).
-#   ABI (optional) - target ABI (default: arm64-v8a).
-#   OPENSSL_VERSION (optional) - version of OpenSSL to fetch (default: 3.2.1).
-#   LIBSSH_VERSION (optional) - version of libssh to fetch (default: 0.10.6).
-#   JOBS (optional) - parallel build job count (default: number of CPU cores).
-#   OUTPUT_ROOT (optional) - base directory for installation results (default: repo root).
+#   ABI (optional)            - target ABI (default: arm64-v8a).
+#   WOLFSSL_VERSION (optional)  - wolfSSL tag to fetch (default: 5.7.0-stable).
+#   LIBSSH2_VERSION (optional)  - libssh2 version to fetch (default: 1.11.1).
+#   JOBS (optional)             - parallel build job count (default: number of CPU cores).
+#   OUTPUT_ROOT (optional)      - installation base directory (default: repo root).
 #
 # Usage:
 #   ./scripts/build_third_party.sh [--abi arm64-v8a] [--clean]
 #
 # Artifacts will be installed to:
-#   <OUTPUT_ROOT>/openssl-out/<abi>
-#   <OUTPUT_ROOT>/libssh-out/<abi>
+#   <OUTPUT_ROOT>/wolfssl-out/<abi>
+#   <OUTPUT_ROOT>/libssh2-out/<abi>
 
 usage() {
   cat <<'USAGE'
@@ -31,8 +31,8 @@ Options:
 Environment:
   OHOS_NDK_HOME      Required. HarmonyOS Native SDK root containing build/cmake/ohos.toolchain.cmake
   OHOS_API_LEVEL     Optional. Target API level (default: 11)
-  OPENSSL_VERSION    Optional. Defaults to 3.2.1
-  LIBSSH_VERSION     Optional. Defaults to 0.10.6
+  WOLFSSL_VERSION    Optional. Defaults to 5.7.0-stable
+  LIBSSH2_VERSION    Optional. Defaults to 1.11.1
   JOBS               Optional. Parallel build job count (defaults to number of cores)
   OUTPUT_ROOT        Optional. Output prefix (defaults to repository root)
 USAGE
@@ -95,15 +95,13 @@ if [[ ! -d "$SYSROOT" ]]; then
 fi
 
 OHOS_API_LEVEL="${OHOS_API_LEVEL:-11}"
-OPENSSL_VERSION="${OPENSSL_VERSION:-3.2.1}"
-LIBSSH_VERSION="${LIBSSH_VERSION:-0.10.6}"
+WOLFSSL_VERSION="${WOLFSSL_VERSION:-5.7.0-stable}"
+LIBSSH2_VERSION="${LIBSSH2_VERSION:-1.11.1}"
 
 require_cmd cmake
 require_cmd curl
 require_cmd tar
-require_cmd perl
 
-# Determine default job count if not provided
 detect_jobs() {
   if command -v nproc >/dev/null 2>&1; then
     nproc
@@ -121,16 +119,15 @@ THIRD_PARTY_DIR="${REPO_ROOT}/third_party"
 SRC_DIR="${THIRD_PARTY_DIR}/src"
 BUILD_DIR="${THIRD_PARTY_DIR}/build"
 DOWNLOAD_DIR="${THIRD_PARTY_DIR}/downloads"
-OPENSSL_OUT="${OUTPUT_ROOT%/}/openssl-out/${ABI}"
-LIBSSH_OUT="${OUTPUT_ROOT%/}/libssh-out/${ABI}"
+WOLFSSL_OUT="${OUTPUT_ROOT%/}/wolfssl-out/${ABI}"
+LIBSSH2_OUT="${OUTPUT_ROOT%/}/libssh2-out/${ABI}"
 
 if [[ "$CLEAN" == "true" ]]; then
   rm -rf "$SRC_DIR" "$BUILD_DIR" "$DOWNLOAD_DIR"
 fi
 
-mkdir -p "$SRC_DIR" "$BUILD_DIR" "$DOWNLOAD_DIR" "$OPENSSL_OUT" "$LIBSSH_OUT"
+mkdir -p "$SRC_DIR" "$BUILD_DIR" "$DOWNLOAD_DIR" "$WOLFSSL_OUT" "$LIBSSH2_OUT"
 
-# Prefer Ninja when available
 CMAKE_GENERATOR=""
 if command -v ninja >/dev/null 2>&1; then
   CMAKE_GENERATOR="-G Ninja"
@@ -168,11 +165,15 @@ extract_source() {
 case "$ABI" in
   arm64-v8a)
     TARGET_TRIPLE="aarch64-linux-ohos"
-    OPENSSL_CONFIG="linux-generic64"
+    CMAKE_PROCESSOR="aarch64"
+    ;;
+  armeabi-v7a)
+    TARGET_TRIPLE="armv7-unknown-linux-ohos"
+    CMAKE_PROCESSOR="armv7"
     ;;
   x86_64)
     TARGET_TRIPLE="x86_64-linux-ohos"
-    OPENSSL_CONFIG="linux-x86_64"
+    CMAKE_PROCESSOR="x86_64"
     ;;
   *)
     echo "Error: unsupported ABI '$ABI'" >&2
@@ -184,85 +185,76 @@ LLVM_BIN="${OHOS_NDK_HOME%/}/native/llvm/bin"
 CLANG_BIN="${LLVM_BIN}/clang"
 AR_BIN="${LLVM_BIN}/llvm-ar"
 RANLIB_BIN="${LLVM_BIN}/llvm-ranlib"
-NM_BIN="${LLVM_BIN}/llvm-nm"
-STRIP_BIN="${LLVM_BIN}/llvm-strip"
 
-for tool in "$CLANG_BIN" "$AR_BIN" "$RANLIB_BIN" "$NM_BIN" "$STRIP_BIN"; do
+for tool in "$CLANG_BIN" "$AR_BIN" "$RANLIB_BIN"; do
   if [[ ! -x "$tool" ]]; then
     echo "Error: required tool '$tool' not found" >&2
     exit 1
   fi
 done
 
-OPENSSL_ARCHIVE="$DOWNLOAD_DIR/openssl-${OPENSSL_VERSION}.tar.gz"
-LIBSSH_ARCHIVE="$DOWNLOAD_DIR/libssh-${LIBSSH_VERSION}.tar.xz"
+WOLFSSL_ARCHIVE="$DOWNLOAD_DIR/wolfssl-${WOLFSSL_VERSION}.tar.gz"
+LIBSSH2_ARCHIVE="$DOWNLOAD_DIR/libssh2-${LIBSSH2_VERSION}.tar.gz"
 
-fetch_source "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" "$OPENSSL_ARCHIVE"
-fetch_source "https://www.libssh.org/files/0.10/libssh-${LIBSSH_VERSION}.tar.xz" "$LIBSSH_ARCHIVE"
+fetch_source "https://github.com/wolfSSL/wolfssl/archive/refs/tags/v${WOLFSSL_VERSION}.tar.gz" "$WOLFSSL_ARCHIVE"
+fetch_source "https://www.libssh2.org/download/libssh2-${LIBSSH2_VERSION}.tar.gz" "$LIBSSH2_ARCHIVE"
 
-OPENSSL_SRC=$(extract_source "$OPENSSL_ARCHIVE" "$SRC_DIR")
-LIBSSH_SRC=$(extract_source "$LIBSSH_ARCHIVE" "$SRC_DIR")
+WOLFSSL_SRC=$(extract_source "$WOLFSSL_ARCHIVE" "$SRC_DIR")
+LIBSSH2_SRC=$(extract_source "$LIBSSH2_ARCHIVE" "$SRC_DIR")
 
-build_openssl() {
-  local build_dir="${BUILD_DIR}/openssl-${ABI}"
+cmake_common_args=(
+  $CMAKE_GENERATOR
+  -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_C_COMPILER="$CLANG_BIN"
+  -DCMAKE_ASM_COMPILER="$CLANG_BIN"
+  -DCMAKE_AR="$AR_BIN"
+  -DCMAKE_RANLIB="$RANLIB_BIN"
+  -DCMAKE_SYSROOT="$SYSROOT"
+  -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
+  -DCMAKE_SYSTEM_NAME=OhOS
+  -DCMAKE_SYSTEM_PROCESSOR="$CMAKE_PROCESSOR"
+  "-DCMAKE_C_FLAGS=--target=${TARGET_TRIPLE} -fPIC"
+  "-DCMAKE_EXE_LINKER_FLAGS=--target=${TARGET_TRIPLE}"
+)
+
+build_wolfssl() {
+  local build_dir="${BUILD_DIR}/wolfssl-${ABI}"
   rm -rf "$build_dir"
-  mkdir -p "$build_dir"
-  pushd "$build_dir" >/dev/null
-
-  local cc="${CLANG_BIN} --target=${TARGET_TRIPLE} --sysroot=${SYSROOT}"
-  local cflags="-fPIC"
-  local ldflags="--target=${TARGET_TRIPLE} --sysroot=${SYSROOT}"
-
-  perl "${OPENSSL_SRC}/Configure" \
-    ${OPENSSL_CONFIG} \
-    no-shared \
-    no-tests \
-    --prefix="${OPENSSL_OUT}" \
-    --openssldir="${OPENSSL_OUT}/ssl" \
-    --libdir=lib \
-    CC="${cc}" \
-    AR="${AR_BIN}" \
-    RANLIB="${RANLIB_BIN}" \
-    NM="${NM_BIN}" \
-    CFLAGS="${cflags}" \
-    LDFLAGS="${ldflags}" >/dev/null
-
-  make -j"${JOBS}" >/dev/null
-  make install_sw >/dev/null
-
-  popd >/dev/null
-}
-
-build_libssh() {
-  local build_dir="${BUILD_DIR}/libssh-${ABI}"
-  rm -rf "$build_dir"
-  mkdir -p "$build_dir"
-  pushd "$build_dir" >/dev/null
-
-  cmake ${CMAKE_GENERATOR} \
-    -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}" \
-    -DOHOS_ARCH="${ABI}" \
-    -DOHOS_PLATFORM="${OHOS_API_LEVEL}" \
-    -DCMAKE_BUILD_TYPE=Release \
+  cmake "${cmake_common_args[@]}" \
+    -DWOLFSSL_EXAMPLES=OFF \
+    -DWOLFSSL_TESTS=OFF \
+    -DWOLFSSL_CRYPT_TESTS=OFF \
+    -DWOLFSSL_OPENSSLEXTRA=ON \
+    -DWOLFSSL_OPENSSLALL=ON \
     -DBUILD_SHARED_LIBS=OFF \
-    -DWITH_EXAMPLES=OFF \
-    -DWITH_TESTS=OFF \
-    -DWITH_GSSAPI=OFF \
-    -DOPENSSL_ROOT_DIR="${OPENSSL_OUT}" \
-    -DOPENSSL_INCLUDE_DIR="${OPENSSL_OUT}/include" \
-    -DOPENSSL_CRYPTO_LIBRARY="${OPENSSL_OUT}/lib/libcrypto.a" \
-    -DOPENSSL_SSL_LIBRARY="${OPENSSL_OUT}/lib/libssl.a" \
-    -DCMAKE_INSTALL_PREFIX="${LIBSSH_OUT}" \
-    "${LIBSSH_SRC}" >/dev/null
+    -DCMAKE_INSTALL_PREFIX="$WOLFSSL_OUT" \
+    -S "$WOLFSSL_SRC" \
+    -B "$build_dir"
 
-  cmake --build . --target install -- -j"${JOBS}" >/dev/null
-
-  popd >/dev/null
+  cmake --build "$build_dir" --target install -- -j"$JOBS"
 }
 
-build_openssl
-build_libssh
+build_libssh2() {
+  local build_dir="${BUILD_DIR}/libssh2-${ABI}"
+  rm -rf "$build_dir"
+  cmake "${cmake_common_args[@]}" \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_EXAMPLES=OFF \
+    -DBUILD_TESTING=OFF \
+    -DCRYPTO_BACKEND=wolfSSL \
+    -DWOLFSSL_INCLUDE_DIR="$WOLFSSL_OUT/include" \
+    -DWOLFSSL_LIBRARY="$WOLFSSL_OUT/lib/libwolfssl.a" \
+    -DCMAKE_INSTALL_PREFIX="$LIBSSH2_OUT" \
+    -S "$LIBSSH2_SRC" \
+    -B "$build_dir"
 
-echo "\nSuccess!"
-echo "OpenSSL installed to: ${OPENSSL_OUT}"
-echo "libssh installed to: ${LIBSSH_OUT}"
+  cmake --build "$build_dir" --target install -- -j"$JOBS"
+}
+
+build_wolfssl
+build_libssh2
+
+echo
+echo "Success!"
+echo "wolfSSL installed to: ${WOLFSSL_OUT}"
+echo "libssh2 installed to: ${LIBSSH2_OUT}"
