@@ -4,17 +4,17 @@
 include(CMakeFindDependencyMacro)
 list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
 
-if("mbedTLS" STREQUAL "OpenSSL")
+if("wolfSSL" STREQUAL "OpenSSL")
   find_dependency(OpenSSL)
-elseif("mbedTLS" STREQUAL "wolfSSL")
+elseif("wolfSSL" STREQUAL "wolfSSL")
   find_dependency(WolfSSL)
-elseif("mbedTLS" STREQUAL "Libgcrypt")
+elseif("wolfSSL" STREQUAL "Libgcrypt")
   find_dependency(Libgcrypt)
-elseif("mbedTLS" STREQUAL "mbedTLS")
+elseif("wolfSSL" STREQUAL "mbedTLS")
   find_dependency(MbedTLS)
 endif()
 
-if()
+if(FALSE)
   find_dependency(ZLIB)
 endif()
 

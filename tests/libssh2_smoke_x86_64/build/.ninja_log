@@ -1,7 +1,3 @@
 # ninja log v6
-3	42	7840322629170017	CMakeFiles/libssh2_smoke.dir/test_libssh2.c.o	e471dc2a0925f5fa
-2	81	7840327777274904	libssh2_smoke	d84866bd587ff3db
-1	563	7840348243102689	build.ninja	ba06df02929b4b55
-1	563	7840348243102689	E:/KESSH/tests/libssh2_smoke_x86_64/build/cmake_install.cmake	ba06df02929b4b55
-1	39	7840348243287996	CMakeFiles/libssh2_smoke.dir/test_libssh2.c.o	de8f0bc024be50d6
-39	111	7840348243667991	libssh2_smoke	1df0d505a395e866
+3	66	7841235121034565	CMakeFiles/libssh2_smoke.dir/test_libssh2.c.o	d7c7e750a83dfa34
+3	82	7841246419814019	libssh2_smoke	5a2d949b94d95c65

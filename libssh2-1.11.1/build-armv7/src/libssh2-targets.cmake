@@ -51,7 +51,7 @@ add_library(libssh2::libssh2_static STATIC IMPORTED)
 
 set_target_properties(libssh2::libssh2_static PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "E:/KESSH/libssh2-1.11.1/include"
-  INTERFACE_LINK_LIBRARIES "E:/KESSH/mbedtls-out/armeabi-v7a/lib/libmbedcrypto.a;E:/KESSH/mbedtls-out/armeabi-v7a/lib/libmbedtls.a;E:/KESSH/mbedtls-out/armeabi-v7a/lib/libmbedx509.a"
+  INTERFACE_LINK_LIBRARIES "E:/KESSH/wolfssl-out/armeabi-v7a/lib/libwolfssl.a"
 )
 
 # Import target "libssh2::libssh2_static" for configuration "Release"

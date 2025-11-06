@@ -60,7 +60,7 @@ add_library(libssh2::libssh2_static STATIC IMPORTED)
 
 set_target_properties(libssh2::libssh2_static PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"
-  INTERFACE_LINK_LIBRARIES "E:/KESSH/mbedtls-out/arm64-v8a/lib/libmbedcrypto.a;E:/KESSH/mbedtls-out/arm64-v8a/lib/libmbedtls.a;E:/KESSH/mbedtls-out/arm64-v8a/lib/libmbedx509.a"
+  INTERFACE_LINK_LIBRARIES "E:/KESSH/wolfssl-out/arm64-v8a/lib/libwolfssl.a"
 )
 
 # Load information for each installed configuration.
