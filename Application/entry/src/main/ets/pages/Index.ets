@@ -2,11 +2,21 @@ import HistoryPage from './HistoryPage';
 import SSHNewPage from './SSHNewPage';
 import SettingsPage from './SettingsPage';
 import TitleBar from '../components/TitleBar';
+import { SSHEngine } from '../common/NativeSSH';
+
+let startupProbeDone: boolean = false;
 
 @Entry
 @Component
 struct Index {
   @State currentIndex: number = 0;
+
+  aboutToAppear(): void {
+    if (!startupProbeDone) {
+      startupProbeDone = true;
+      SSHEngine.startupDiagnostic();
+    }
+  }
 
   build() {
     Column() {

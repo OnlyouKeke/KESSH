@@ -10,10 +10,10 @@
       "path": "./src/main/cpp/CMakeLists.txt",
       "abiFilters": ["arm64-v8a"],
       "arguments": [
-        "-DLIBSSH_INCLUDE_DIR_ARM64=E:/KESSH/libssh-out/arm64-v8a/include",
-        "-DLIBSSH_LIBRARY_ARM64=E:/KESSH/libssh-out/arm64-v8a/lib/libssh.a",
-        "-DOPENSSL_INCLUDE_DIR_ARM64=E:/KESSH/openssl-out/arm64-v8a/include",
-        "-DOPENSSL_LIBS_ARM64=E:/KESSH/openssl-out/arm64-v8a/lib/libssl.a;E:/KESSH/openssl-out/arm64-v8a/lib/libcrypto.a"
+        "-DLIBSSH2_INCLUDE_DIR_ARM64=E:/KESSH/libssh2-out/arm64-v8a/include",
+        "-DLIBSSH2_LIBRARY_ARM64=E:/KESSH/libssh2-out/arm64-v8a/lib/libssh2.a;E:/KESSH/mbedtls-out/arm64-v8a/lib/libmbedtls.a;E:/KESSH/mbedtls-out/arm64-v8a/lib/libmbedx509.a;E:/KESSH/mbedtls-out/arm64-v8a/lib/libmbedcrypto.a",
+        "-DLIBSSH2_INCLUDE_DIR_ARMV7=E:/KESSH/libssh2-out/armeabi-v7a/include",
+        "-DLIBSSH2_LIBRARY_ARMV7=E:/KESSH/libssh2-out/armeabi-v7a/lib/libssh2.a;E:/KESSH/mbedtls-out/armeabi-v7a/lib/libmbedtls.a;E:/KESSH/mbedtls-out/armeabi-v7a/lib/libmbedx509.a;E:/KESSH/mbedtls-out/armeabi-v7a/lib/libmbedcrypto.a"
       ],
       "cppFlags": "-std=c++17"
     }

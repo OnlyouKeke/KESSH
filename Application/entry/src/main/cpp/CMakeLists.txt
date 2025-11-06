@@ -4,70 +4,88 @@ project(sshnative)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-function(normalize_path OUTPUT INPUT)
-  if(INPUT)
-    file(TO_CMAKE_PATH "${INPUT}" _tmp)
-    set(${OUTPUT} "${_tmp}" PARENT_SCOPE)
-  else()
-    set(${OUTPUT} "" PARENT_SCOPE)
-  endif()
-endfunction()
+# You must provide libssh2 for your target (e.g., prebuilt or fetched in your toolchain)
+# Prefer per-ABI variables so one build can cover multiple ABIs:
+#   LIBSSH2_INCLUDE_DIR_ARM64, LIBSSH2_LIBRARY_ARM64
+#   LIBSSH2_INCLUDE_DIR_ARMV7, LIBSSH2_LIBRARY_ARMV7
+#   LIBSSH2_INCLUDE_DIR_X64,   LIBSSH2_LIBRARY_X64 (if targeting x86_64)
+# Fallback to single-ABI variables: LIBSSH2_INCLUDE_DIR, LIBSSH2_LIBRARY
 
 set(_ARCH "")
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
   set(_ARCH "arm64-v8a")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+  set(_ARCH "armeabi-v7a")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
   set(_ARCH "x86_64")
 endif()
 
-set(_LIBSSH_INC "")
-set(_LIBSSH_LIB "")
-set(_OPENSSL_INC "")
-set(_OPENSSL_LIBS "")
+set(_INC "")
+set(_LIBS "")
 
-if(DEFINED LIBSSH_INCLUDE_DIR AND DEFINED LIBSSH_LIBRARY)
-  normalize_path(_LIBSSH_INC "${LIBSSH_INCLUDE_DIR}")
-  set(_LIBSSH_LIB "${LIBSSH_LIBRARY}")
+if(DEFINED LIBSSH2_INCLUDE_DIR AND DEFINED LIBSSH2_LIBRARY)
+  set(_INC  ${LIBSSH2_INCLUDE_DIR})
+  set(_LIBS ${LIBSSH2_LIBRARY})
 else()
   if(_ARCH STREQUAL "arm64-v8a")
-    normalize_path(_LIBSSH_INC "${LIBSSH_INCLUDE_DIR_ARM64}")
-    set(_LIBSSH_LIB "${LIBSSH_LIBRARY_ARM64}")
+    if(DEFINED LIBSSH2_INCLUDE_DIR_ARM64)
+      set(_INC ${LIBSSH2_INCLUDE_DIR_ARM64})
+    endif()
+    if(DEFINED LIBSSH2_LIBRARY_ARM64)
+      set(_LIBS ${LIBSSH2_LIBRARY_ARM64})
+    endif()
+  elseif(_ARCH STREQUAL "armeabi-v7a")
+    if(DEFINED LIBSSH2_INCLUDE_DIR_ARMV7)
+      set(_INC ${LIBSSH2_INCLUDE_DIR_ARMV7})
+    endif()
+    if(DEFINED LIBSSH2_LIBRARY_ARMV7)
+      set(_LIBS ${LIBSSH2_LIBRARY_ARMV7})
+    endif()
   elseif(_ARCH STREQUAL "x86_64")
-    normalize_path(_LIBSSH_INC "${LIBSSH_INCLUDE_DIR_X64}")
-    set(_LIBSSH_LIB "${LIBSSH_LIBRARY_X64}")
+    if(DEFINED LIBSSH2_INCLUDE_DIR_X64)
+      set(_INC ${LIBSSH2_INCLUDE_DIR_X64})
+    endif()
+    if(DEFINED LIBSSH2_LIBRARY_X64)
+      set(_LIBS ${LIBSSH2_LIBRARY_X64})
+    endif()
   endif()
 endif()
 
-if(NOT _LIBSSH_INC OR NOT _LIBSSH_LIB)
-  message(FATAL_ERROR "libssh include/library paths not configured for ${_ARCH}. Define LIBSSH_INCLUDE_DIR/LIBSSH_LIBRARY or per-ABI variants.")
+if(NOT _INC OR NOT _LIBS)
+  message(FATAL_ERROR "libssh2 include/libs not configured for ${_ARCH}. Define LIBSSH2_INCLUDE_DIR/Library or per-ABI variants.")
 endif()
 
-if(DEFINED OPENSSL_INCLUDE_DIR AND DEFINED OPENSSL_LIBS)
-  normalize_path(_OPENSSL_INC "${OPENSSL_INCLUDE_DIR}")
-  set(_OPENSSL_LIBS "${OPENSSL_LIBS}")
-else()
-  if(_ARCH STREQUAL "arm64-v8a")
-    normalize_path(_OPENSSL_INC "${OPENSSL_INCLUDE_DIR_ARM64}")
-    set(_OPENSSL_LIBS "${OPENSSL_LIBS_ARM64}")
-  elseif(_ARCH STREQUAL "x86_64")
-    normalize_path(_OPENSSL_INC "${OPENSSL_INCLUDE_DIR_X64}")
-    set(_OPENSSL_LIBS "${OPENSSL_LIBS_X64}")
-  endif()
-endif()
-
-if(NOT _OPENSSL_INC OR NOT _OPENSSL_LIBS)
-  message(FATAL_ERROR "OpenSSL include/library paths not configured for ${_ARCH}. Define OPENSSL_INCLUDE_DIR/OPENSSL_LIBS or per-ABI variants.")
-endif()
-
-include_directories(${_LIBSSH_INC} ${_OPENSSL_INC} ${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${_INC} ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_library(sshnative SHARED
   src/sshnative.cpp
 )
 
-# Link against libssh and the provided OpenSSL libraries
-separate_arguments(_OPENSSL_LIBS)
-target_link_libraries(sshnative ${_LIBSSH_LIB} ${_OPENSSL_LIBS})
+set(_SYSROOT_LIB_SUBDIR "")
+if(CMAKE_SYSROOT)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    set(_SYSROOT_LIB_SUBDIR "${CMAKE_SYSROOT}/usr/lib/aarch64-linux-ohos")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+    set(_SYSROOT_LIB_SUBDIR "${CMAKE_SYSROOT}/usr/lib/arm-linux-ohos")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+    set(_SYSROOT_LIB_SUBDIR "${CMAKE_SYSROOT}/usr/lib/x86_64-linux-ohos")
+  endif()
+endif()
+
+find_library(ACE_NAPI_LIB
+  NAMES ace_napi.z
+  HINTS
+    ${_SYSROOT_LIB_SUBDIR}
+    "${CMAKE_SYSROOT}/usr/lib"
+)
+
+if(NOT ACE_NAPI_LIB)
+  message(FATAL_ERROR "ace_napi.z not found; ensure HarmonyOS NAPI runtime is installed in the sysroot.")
+endif()
+
+set(_EXTRA_SYS_LIBS dl pthread)
+
+target_link_libraries(sshnative ${_LIBS} ${ACE_NAPI_LIB} ${_EXTRA_SYS_LIBS})
 
 target_compile_definitions(sshnative PRIVATE NAPI_VERSION=8)
 

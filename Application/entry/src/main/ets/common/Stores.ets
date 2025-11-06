@@ -1,3 +1,9 @@
+import hilog from '@ohos.hilog';
+import { SecurityUtils } from './SecurityUtils';
+
+const APPLOG_DOMAIN = 0xD15A;
+const APPLOG_TAG = 'AppLogger';
+
 export type AuthType = 'password' | 'key';
 
 export interface ConnectionDraft {
@@ -26,6 +32,7 @@ export interface ImportedKey {
   content: string; // private key PEM content
   publicKey?: string; // public key (OpenSSH/PEM), optional
   passphrase?: string; // optional
+  fingerprint?: string; // SHA-256 digest for display
 }
 
 export class Logger {
@@ -35,6 +42,7 @@ export class Logger {
     const ts = new Date();
     const timeStr = `${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}:${ts.getSeconds().toString().padStart(2,'0')}`;
     Logger.logs.unshift(`[${timeStr}] ${message}`);
+    hilog.debug(APPLOG_DOMAIN, APPLOG_TAG, '%{public}s', message);
   }
 
   static list(): Array<string> {
@@ -89,9 +97,10 @@ export class KeyStore {
   private static keys: Array<ImportedKey> = [];
 
   static importKey(name: string, content: string, publicKey?: string, passphrase?: string): ImportedKey {
-    const k: ImportedKey = { id: KeyStore.seq++, name, content, publicKey, passphrase };
+    const fingerprint = SecurityUtils.sha256Hex(content);
+    const k: ImportedKey = { id: KeyStore.seq++, name, content, publicKey, passphrase, fingerprint };
     KeyStore.keys.unshift(k);
-    Logger.log(`密钥: 导入 ${name}`);
+    Logger.log(`密钥: 导入 ${name}${fingerprint ? ` fingerprint=${fingerprint.slice(0, 12)}…` : ''}`);
     return k;
   }
 

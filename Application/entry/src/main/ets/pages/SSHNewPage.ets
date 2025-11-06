@@ -1,6 +1,10 @@
 import { promptAction, router } from '@kit.ArkUI';
+import hilog from '@ohos.hilog';
 import { Logger, SettingsStore, ConnectionStore, KeyStore, ImportedKey, AuthType, ConnectionDraft } from '../common/Stores';
 import { SSHEngine } from '../common/NativeSSH';
+
+const LOG_DOMAIN = 0xD15A;
+const LOG_TAG = 'SSHNewPage';
 
 @Entry
 @Component
@@ -24,10 +28,17 @@ export default struct SSHNewPage {
   }
 
   private async onConnect(): Promise<void> {
-    if (!this.host || !this.username) {
-      promptAction.showToast({ message: '请填写主机与用户名' });
+    const host = (this.host || '').trim();
+    const username = (this.username || '').trim();
+    const portValue = (this.port || '22').trim();
+
+    if (!host || !username) {
+      Logger.log('UI: missing host or username for connection attempt');
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'missing host or username');
+      promptAction.showToast({ message: '请填写主机与用户信息' });
       return;
     }
+
     const auth: AuthType = this.authType === 'key' ? 'key' : 'password';
     let keyContent: string | undefined = undefined;
     let keyPublic: string | undefined = undefined;
@@ -35,6 +46,8 @@ export default struct SSHNewPage {
     if (auth === 'key') {
       const k: ImportedKey | null = KeyStore.getById(this.selectedKeyId);
       if (!k) {
+        Logger.log('UI: no key selected for key-based authentication');
+        hilog.warn(LOG_DOMAIN, LOG_TAG, 'no key selected for key auth');
         promptAction.showToast({ message: '请选择已导入的密钥' });
         return;
       }
@@ -44,9 +57,9 @@ export default struct SSHNewPage {
     }
 
     const draft: ConnectionDraft = {
-      host: this.host,
-      port: this.port,
-      username: this.username,
+      host,
+      port: portValue,
+      username,
       password: auth === 'password' && SettingsStore.savePassword ? this.password : undefined,
       privateKey: keyContent,
       publicKey: keyPublic,
@@ -56,11 +69,18 @@ export default struct SSHNewPage {
       ConnectionStore.addFromDraft(draft, auth);
     }
     ConnectionStore.currentDraft = draft;
-    Logger.log(`连接: ${this.username}@${this.host}:${this.port} 使用${auth === 'password' ? '密码' : '密钥'}`);
 
+    Logger.log(`UI: attempt ${auth} connection ${username}@${host}:${portValue}`);
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'attempt connection %{public}s@%{public}s:%{public}s via %{public}s', username, host, portValue, auth);
+
+    const parsedPort = parseInt(portValue || '22');
     const ok = auth === 'password'
-      ? await SSHEngine.connectPassword(this.host, parseInt(this.port || '22'), this.username, this.password)
-      : await SSHEngine.connectKey2(this.host, parseInt(this.port || '22'), this.username, keyContent as string, keyPublic || '', keyPassphrase);
+      ? await SSHEngine.connectPassword(host, parsedPort, username, this.password)
+      : await SSHEngine.connectKey2(host, parsedPort, username, keyContent as string, keyPublic || '', keyPassphrase);
+
+    Logger.log(`UI: connection result ${username}@${host}:${portValue} => ${ok ? 'success' : 'failure'}`);
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'connection result %{public}s@%{public}s:%{public}s => %{public}s', username, host, portValue, ok ? 'success' : 'failure');
+
     promptAction.showToast({ message: ok ? '连接成功' : '连接失败' });
     if (ok) {
       router.pushUrl({ url: 'pages/Terminal' });

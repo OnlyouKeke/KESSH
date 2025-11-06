@@ -73,7 +73,14 @@ export default struct SettingsKeys {
           ForEach(KeyStore.list(), (k: ImportedKey) => {
             ListItem() {
               Row() {
-                Text(k.name).fontSize(14)
+                Column({ space: 4 }) {
+                  Text(k.name).fontSize(14)
+                  if (k.fingerprint) {
+                    Text(`指纹: ${k.fingerprint.slice(0, 32)}…`)
+                      .fontSize(10)
+                      .fontColor(Color.Grey)
+                  }
+                }
                 Blank().layoutWeight(1)
                 Button('删除')
                   .type(ButtonType.Normal)

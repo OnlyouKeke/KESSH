@@ -489,6 +489,16 @@ static napi_value TermClose(napi_env env, napi_callback_info info)
     return nullptr;
 }
 
+static napi_value GetVersion(napi_env env, napi_callback_info info)
+{
+    ensure_lib_init();
+    const char* ver = libssh2_version(0);
+    if (!ver) {
+        return string_of(env, "");
+    }
+    return string_of(env, ver);
+}
+
 static void define_function(napi_env env, napi_value exports, const char* name, napi_callback cb)
 {
     napi_value fn;
@@ -508,6 +518,7 @@ static napi_value Init(napi_env env, napi_value exports)
     define_function(env, exports, "termWrite", TermWrite);
     define_function(env, exports, "termRead", TermRead);
     define_function(env, exports, "termClose", TermClose);
+    define_function(env, exports, "getVersion", GetVersion);
     return exports;
 }
 
