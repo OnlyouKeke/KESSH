@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"E:/KESSH/Application/entry/src/main/cpp/build-arm64/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
