@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"E:/KESSH/libssh2-1.11.1/build-x86_64/cmake_install.cmake",
+		"E:/KESSH/libssh2-1.11.1/build-x86_64/src/cmake_install.cmake",
+		"E:/KESSH/libssh2-1.11.1/build-x86_64/docs/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

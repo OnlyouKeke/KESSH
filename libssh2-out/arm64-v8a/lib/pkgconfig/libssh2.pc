@@ -1,0 +1,21 @@
+###########################################################################
+# libssh2 installation details
+#
+# Copyright (C) The libssh2 project and its contributors.
+# SPDX-License-Identifier: BSD-3-Clause
+###########################################################################
+
+prefix=E:/KESSH/libssh2-out/arm64-v8a
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libssh2
+URL: https://libssh2.org/
+Description: Library for SSH-based communication
+Version: 1.11.1
+Requires: mbedcrypto
+Requires.private: mbedcrypto
+Libs: -L${libdir} -lssh2 -LE:/KESSH/mbedtls-out/arm64-v8a/lib -lmbedcrypto -lmbedtls -lmbedx509
+Libs.private: -LE:/KESSH/mbedtls-out/arm64-v8a/lib -lmbedcrypto -lmbedtls -lmbedx509
+Cflags: -I${includedir}
