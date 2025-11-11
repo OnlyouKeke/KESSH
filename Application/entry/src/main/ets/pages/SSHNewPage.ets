@@ -1,7 +1,7 @@
 import { promptAction, router } from '@kit.ArkUI';
 import hilog from '@ohos.hilog';
 import { Logger, SettingsStore, ConnectionStore, KeyStore, ImportedKey, AuthType, ConnectionDraft } from '../common/Stores';
-import { SSHEngine } from '../common/NativeSSH';
+import { SSHEngine } from '../common/JvchSSH';
 
 const LOG_DOMAIN = 0xD15A;
 const LOG_TAG = 'SSHNewPage';
