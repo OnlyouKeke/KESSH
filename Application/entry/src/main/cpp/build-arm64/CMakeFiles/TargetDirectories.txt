@@ -1,3 +1,0 @@
-E:/KESSH/Application/entry/src/main/cpp/build-arm64/CMakeFiles/sshnative.dir
-E:/KESSH/Application/entry/src/main/cpp/build-arm64/CMakeFiles/edit_cache.dir
-E:/KESSH/Application/entry/src/main/cpp/build-arm64/CMakeFiles/rebuild_cache.dir
