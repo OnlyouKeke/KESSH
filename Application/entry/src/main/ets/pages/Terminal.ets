@@ -1,5 +1,5 @@
 import { ConnectionStore } from '../common/Stores';
-import { SSHEngine } from '../common/NativeSSH';
+import { SSHEngine } from '../common/JvchSSH';
 import { router } from '@kit.ArkUI';
 
 @Entry
