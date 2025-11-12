@@ -1,5 +1,5 @@
 import { ConnectionStore } from '../common/Stores';
-import { SSHEngine } from '../common/JvchSSH';
+import { SSHEngine } from '../common/SSHEngine';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -18,14 +18,16 @@ export default struct Terminal {
       ];
       const port = parseInt(d.port || '22');
       if (d.privateKey) {
-        this.sessionId = SSHEngine.openSessionKey2(d.host, port, d.username, d.privateKey, d.publicKey || '', d.passphrase);
+        // FIXME: Private key authentication is not yet supported
+        this.lines.push('密钥认证功能暂未实现');
+        // this.sessionId = SSHEngine.openSession(d.host, port, d.username, d.privateKey, d.publicKey || '', d.passphrase);
       } else {
-        this.sessionId = SSHEngine.openSessionPassword(d.host, port, d.username, d.password || '');
+        this.sessionId = SSHEngine.openSession(d.host, port, d.username, d.password || '');
       }
       // 轮询读取输出
       if (this.sessionId > 0) {
         const tid = setInterval(() => {
-          const chunk = SSHEngine.termRead(this.sessionId);
+          const chunk = SSHEngine.read(this.sessionId);
           if (chunk && chunk.length > 0) {
             this.lines.push(chunk);
           }
@@ -45,7 +47,7 @@ export default struct Terminal {
       this.timerId = -1;
     }
     if (this.sessionId > 0) {
-      SSHEngine.termClose(this.sessionId);
+      SSHEngine.closeSession(this.sessionId);
       this.sessionId = -1;
     }
   }
@@ -55,7 +57,7 @@ export default struct Terminal {
     const cmd = this.cmd;
     this.cmd = '';
     this.lines.push(`$ ${cmd}`);
-    SSHEngine.termWrite(this.sessionId, cmd + '\n');
+    SSHEngine.write(this.sessionId, cmd + '\n');
   }
 
   build() {

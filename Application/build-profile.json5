@@ -5,20 +5,20 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "storeFile": "E:/KESSH/KESSH.p12",
-          "storePassword": "00000018BF517F242A08FB674C705C4CC8DF699E73822D290B106478F4EC5B35A34281AB00EDA8AA",
+          "storeFile": "E:/keygen/kessh.p12",
+          "storePassword": "00000018BFDAF851547F052F47083D020A315ACF8251D51FF335BDA4B645987F26361C21B48FF28D",
           "keyAlias": "keke",
-          "keyPassword": "000000181077EB397B1CA65A89923414AA33CFF4BE3B91C51C4CA30A4A8B86D3D072077E868D3850",
+          "keyPassword": "0000001844CE0C1428A9554A4B85B28781C6853CD33948C1CFC21C23FA07000F29BB33BD513CA943",
           "signAlg": "SHA256withECDSA",
-          "profile": "E:/KESSH/KESSHRelease.p7b",
-          "certpath": "E:/KESSH/KESSH.cer"
+          "profile": "E:/keygen/kesshRelease.p7b",
+          "certpath": "E:/keygen/kessh.cer"
         }
       }
     ],
     "products": [
       {
         "name": "default",
-        "signingConfig": "default",
+        // "signingConfig": "default",
         "targetSdkVersion": "6.0.0(20)",
         "compatibleSdkVersion": "5.1.0(18)",
         "runtimeOS": "HarmonyOS",

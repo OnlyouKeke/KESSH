@@ -1,7 +1,7 @@
 import { promptAction, router } from '@kit.ArkUI';
 import hilog from '@ohos.hilog';
 import { Logger, SettingsStore, ConnectionStore, KeyStore, ImportedKey, AuthType, ConnectionDraft } from '../common/Stores';
-import { SSHEngine } from '../common/JvchSSH';
+import { SSHEngine } from '../common/SSHEngine';
 
 const LOG_DOMAIN = 0xD15A;
 const LOG_TAG = 'SSHNewPage';
@@ -74,9 +74,17 @@ export default struct SSHNewPage {
     hilog.info(LOG_DOMAIN, LOG_TAG, 'attempt connection %{public}s@%{public}s:%{public}s via %{public}s', username, host, portValue, auth);
 
     const parsedPort = parseInt(portValue || '22');
-    const ok = auth === 'password'
-      ? await SSHEngine.connectPassword(host, parsedPort, username, this.password)
-      : await SSHEngine.connectKey2(host, parsedPort, username, keyContent as string, keyPublic || '', keyPassphrase);
+    let ok: boolean = false;
+    if (auth === 'password') {
+      const sessionId = SSHEngine.openSession(host, parsedPort, username, this.password);
+      ok = sessionId > 0;
+      if (ok) SSHEngine.closeSession(sessionId);
+    } else {
+      // FIXME: Private key authentication is not yet supported
+      // const sessionId = SSHEngine.openSession(host, parsedPort, username, keyContent as string, keyPublic || '', keyPassphrase);
+      // ok = sessionId > 0;
+      // if (ok) SSHEngine.closeSession(sessionId);
+    }
 
     Logger.log(`UI: connection result ${username}@${host}:${portValue} => ${ok ? 'success' : 'failure'}`);
     hilog.info(LOG_DOMAIN, LOG_TAG, 'connection result %{public}s@%{public}s:%{public}s => %{public}s', username, host, portValue, ok ? 'success' : 'failure');
