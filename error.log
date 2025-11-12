@@ -1,0 +1,49 @@
+2025-11-12 20:19:31 48827-49362/hdc I/C01719/cn.zwjkeke.ssh/ffrt: 24:~CPUWorker:84 to exit, qos[4]
+2025-11-12 20:19:31 48827-49296/hdc I/C01719/cn.zwjkeke.ssh/ffrt: 25:~CPUWorker:84 to exit, qos[5]
+2025-11-12 20:19:31 48827-49294/hdc I/C01719/cn.zwjkeke.ssh/ffrt: 26:~CPUWorker:84 to exit, qos[5]
+2025-11-12 20:19:32 7147-8785/hdc E/C04170/distributedsched/DSched_Service: DMSContinueRecomMgr::PublishContinueRecommend CheckBroadcastCondition FOCUSED failed! status: [ missionId: 4699 bundleName: cn.zwjkeke.ssh moduleName: entry abilityName: EntryAbility isContinuable: 0 launchFlag: 0 isFocused: 1 continueState: 0 ]
+2025-11-12 20:19:34 48827-49361/hdc I/C01719/cn.zwjkeke.ssh/ffrt: 27:~CPUWorker:84 to exit, qos[4]
+2025-11-12 20:19:34 48827-49295/hdc I/C01719/cn.zwjkeke.ssh/ffrt: 28:~CPUWorker:84 to exit, qos[5]
+2025-11-12 20:19:37 7147-8785/hdc E/C04170/distributedsched/DSched_Service: DMSContinueRecomMgr::PublishContinueRecommend CheckBroadcastCondition FOCUSED failed! status: [ missionId: 4699 bundleName: cn.zwjkeke.ssh moduleName: entry abilityName: EntryAbility isContinuable: 0 launchFlag: 0 isFocused: 1 continueState: 0 ]
+2025-11-12 20:19:39 890-2162/hdc E/C02802/multimodalinput/KeyCommandHandler: [P:D:1107551][CheckBundleName:2927] The app does not support long-press drag., bundle name:cn.zwjkeke.ssh
+2025-11-12 20:19:39 890-2162/hdc I/C02805/multimodalinput/InputKeyFlow: [P:D:1107551][DispatchPointerEventInner:409] SendMsg to cn.zwjkeke.ssh:pid:48827
+2025-11-12 20:19:39 48827-48827/hdc I/C02805/cn.zwjkeke.ssh/InputKeyFlow: [][OnPointerEvent:210] ac: down: 1107551
+2025-11-12 20:19:39 48827-48827/hdc I/C02805/cn.zwjkeke.ssh/InputKeyFlow: [P:D:1107551][OnPointerEvent:646] id:1107551 recv
+2025-11-12 20:19:39 48827-48827/hdc I/C04213/cn.zwjkeke.ssh/InputKeyFlow: [] HandleInputEvent(88): eid:14,InputId:1107551,wid:4699,ac:2
+2025-11-12 20:19:39 48827-48827/hdc I/C03951/cn.zwjkeke.ssh/InputKeyFlow: [(100000:100000:scope)] InputTracking id:1107551, fingerId:10000, type=0, inject=0, isPrivacyMode=0
+2025-11-12 20:19:39 48827-48827/hdc I/C03951/cn.zwjkeke.ssh/InputKeyFlow: [(100000:100000:scope)] InputTracking id:1107551, touch test hitted node info: fingerId: 10000{ tag: Swiper, depth: 7 };{ tag: Scroll, depth: 10 };{ tag: Button, depth: 12 };
+2025-11-12 20:19:39 48827-48827/hdc I/C03951/cn.zwjkeke.ssh/InputKeyFlow: [(100000:100000:scope)] InputTracking id:1107551, touch test hitted recognizer type info: recognizer type ClickRecognizer node info: { tag: Scroll }; { tag: Button };recognizer type PanRecognizer node info: { tag: Scroll }; { tag: Swiper };
+2025-11-12 20:19:39 48827-48827/hdc I/C03945/cn.zwjkeke.ssh/AceStateStyle: [(100000:100000:scope)] Handle TouchDown event node: Button
+2025-11-12 20:19:39 48827-48827/hdc I/C03915/cn.zwjkeke.ssh/AceSwiper: [(100000:100000:scope)] Swiper HandleTouchDown id: 9
+2025-11-12 20:19:39 48827-48827/hdc I/C03919/cn.zwjkeke.ssh/AceInputTracking: [(100000:100000:scope)] Consumed new event id=1107551 in ace_container, lastEventInfo: id:-1
+2025-11-12 20:19:39 48827-48827/hdc I/C04213/cn.zwjkeke.ssh/InputKeyFlow: [] ConsumePointerEventInner(1098): InputId:1107551,wid:4699,pointId:10000,srcType:2,rect:[0,0,1276,2848],notify:1
+2025-11-12 20:19:39 890-2162/hdc I/C02805/multimodalinput/InputKeyFlow: [P:U:1107552][DispatchPointerEventInner:409] SendMsg to cn.zwjkeke.ssh:pid:48827
+2025-11-12 20:19:39 48827-48827/hdc I/C02805/cn.zwjkeke.ssh/InputKeyFlow: [][OnPointerEvent:210] ac: up: 1107552
+2025-11-12 20:19:39 48827-48827/hdc I/C02805/cn.zwjkeke.ssh/InputKeyFlow: [P:U:1107552][OnPointerEvent:646] id:1107552 recv
+2025-11-12 20:19:39 48827-48827/hdc I/C04213/cn.zwjkeke.ssh/InputKeyFlow: [] HandleInputEvent(88): eid:15,InputId:1107552,wid:4699,ac:4
+2025-11-12 20:19:39 48827-48827/hdc I/C03951/cn.zwjkeke.ssh/InputKeyFlow: [(100000:100000:scope)] InputTracking id:1107552, fingerId:10000, type=1, inject=0, isPrivacyMode=0
+2025-11-12 20:19:39 48827-48827/hdc I/C03945/cn.zwjkeke.ssh/AceStateStyle: [(100000:100000:scope)] Handle TouchUp or Cancel event node: Button
+2025-11-12 20:19:39 48827-48827/hdc I/C03915/cn.zwjkeke.ssh/AceSwiper: [(100000:100000:scope)] Swiper HandleTouchUp id: 9
+2025-11-12 20:19:39 48827-48827/hdc I/C0391E/cn.zwjkeke.ssh/AceGesture: [(100000:100000:scope)] Click try accept
+2025-11-12 20:19:39 48827-48827/hdc I/C0390B/cn.zwjkeke.ssh/AceScrollable: [(100000:100000:scope)] Scrollable GestureJudge:0, 0
+2025-11-12 20:19:39 48827-48827/hdc I/C0391E/cn.zwjkeke.ssh/AceGesture: [(100000:100000:scope)] Click gesture judge reject
+2025-11-12 20:19:39 48827-48827/hdc I/C0391E/cn.zwjkeke.ssh/AceGesture: [(100000:100000:scope)] Click try accept
+2025-11-12 20:19:39 48827-48827/hdc I/C03951/cn.zwjkeke.ssh/InputKeyFlow: [(100000:100000:scope)] Click accepted, tag: Button
+2025-11-12 20:19:39 48827-48827/hdc I/A0D15A/cn.zwjkeke.ssh/SSHNewPage: ========================================
+2025-11-12 20:19:39 48827-48827/hdc I/A0D15A/cn.zwjkeke.ssh/SSHNewPage: [UI STEP 1] 开始连接尝试
+2025-11-12 20:19:39 48827-48827/hdc I/A0D15A/cn.zwjkeke.ssh/SSHNewPage: [UI STEP 2] 连接参数: huawei@180.184.41.146:22
+2025-11-12 20:19:39 48827-48827/hdc I/A0D15A/cn.zwjkeke.ssh/SSHNewPage: [UI STEP 3] 认证方式: password
+2025-11-12 20:19:39 48827-48827/hdc I/A0D15A/cn.zwjkeke.ssh/SSHNewPage: [UI STEP 4] 解析端口: 22
+2025-11-12 20:19:39 48827-48827/hdc W/C03926/cn.zwjkeke.ssh/AceTheme: [(100000:100000:scope)] style 125829872 not contains toast_pattern!
+2025-11-12 20:19:39 48827-48827/hdc W/C03926/cn.zwjkeke.ssh/AceTheme: [(100000:100000:scope)] style ohos_shadow_pattern not contains shadow_style_default_md_radius!
+2025-11-12 20:19:39 48827-48827/hdc I/A0D15A/cn.zwjkeke.ssh/SSHNewPage: [UI STEP 5] 密码认证模式，准备在后台线程调用 SSHEngine.openSession
+2025-11-12 20:19:39 48827-48827/hdc I/A0D15A/cn.zwjkeke.ssh/SSHNewPage: [UI STEP 6] 调用参数检查 - host: 180.184.41.146, port: 22, user: huawei, passLen: 6
+2025-11-12 20:19:39 48827-48827/hdc I/A0D15A/cn.zwjkeke.ssh/SSHNewPage: [UI STEP 6.1] 创建 taskpool 任务，准备执行
+2025-11-12 20:19:39 48827-48827/hdc I/C03F01/cn.zwjkeke.ssh/NAPI: taskpool:: Task Allocation: 2649823872, 1
+2025-11-12 20:19:39 48827-49292/hdc I/C03F01/cn.zwjkeke.ssh/NAPI: taskpool:: Task Perform: sshConnectTask, 2649823872, runningLoop: 393422077056
+2025-11-12 20:19:39 48827-49292/hdc I/C03F01/cn.zwjkeke.ssh/NAPI: [(native_module_manager.cpp:619)(LoadNativeModule)] key is default/kessh
+2025-11-12 20:19:39 48827-49292/hdc I/A0D15C/cn.zwjkeke.ssh/KesshNative: Initializing kessh native module
+2025-11-12 20:19:39 48827-48827/hdc I/C03951/cn.zwjkeke.ssh/InputKeyFlow: [(100000:100000:scope)] id: 10000, log: {types: Click, tag: Scroll, prcd: Down, state: READY, extraInfo: ETF: 0 CFP: 0, prcd: Up, state: FAIL, extraInfo: ETF: 0 CFP: 0}{types: Click, tag: Button, prcd: Down, state: READY, extraInfo: ETF: 0 CFP: 0, prcd: Up, state: SUCCEED, extraInfo: ETF: 0 CFP: 0}{types: Pan, tag: Scroll, prcd: Down, state: DETECTING, prcd: Up, state: FAIL, extraInfo: currentFingers: 1 fingers: 1}{types: Pan, tag: Swiper, prcd: Down, state: DETECTING, prcd: Up, state: FAIL, extraInfo: currentFingers: 1 fingers: 1}
+2025-11-12 20:19:39 48827-49292/hdc I/A0D15C/cn.zwjkeke.ssh/KesshNative: Kessh native module initialized successfully
+2025-11-12 20:19:39 48827-48827/hdc I/C03919/cn.zwjkeke.ssh/AceInputTracking: [(100000:100000:scope)] Consumed new event id=1107552 in ace_container, lastEventInfo: id:-1
+2025-11-12 20:19:39 48827-49290/hdc I/C03924/cn.zwjkeke.ssh/AceAccessibility: [(100000:100000:scope)] send accessibility componentType:Button event:1 accessibilityId:66

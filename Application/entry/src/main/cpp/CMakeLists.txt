@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.5.0)
 project(kessh)
 
 set(NATIVERENDER_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR})
@@ -14,13 +14,29 @@ include_directories(${LIBSSH2_ROOT}/include)
 include_directories(${WOLFSSL_ROOT}/include)
 
 # Import prebuilt libssh2
-add_library(ssh2 SHARED IMPORTED)
-set_target_properties(ssh2 PROPERTIES IMPORTED_LOCATION ${LIBSSH2_ROOT}/lib/libssh2.so)
+if(EXISTS "${LIBSSH2_ROOT}/lib/libssh2.a")
+    add_library(ssh2 STATIC IMPORTED)
+    set_target_properties(ssh2 PROPERTIES IMPORTED_LOCATION ${LIBSSH2_ROOT}/lib/libssh2.a)
+    message(STATUS "Found libssh2 static library")
+else()
+    message(FATAL_ERROR "libssh2 library not found at ${LIBSSH2_ROOT}/lib/libssh2.a")
+endif()
 
 # Import prebuilt wolfssl
-add_library(wolfssl SHARED IMPORTED)
-set_target_properties(wolfssl PROPERTIES IMPORTED_LOCATION ${WOLFSSL_ROOT}/lib/libwolfssl.so)
+if(EXISTS "${WOLFSSL_ROOT}/lib/libwolfssl.a")
+    add_library(wolfssl STATIC IMPORTED)
+    set_target_properties(wolfssl PROPERTIES IMPORTED_LOCATION ${WOLFSSL_ROOT}/lib/libwolfssl.a)
+    message(STATUS "Found wolfssl static library")
+else()
+    message(FATAL_ERROR "wolfssl library not found at ${WOLFSSL_ROOT}/lib/libwolfssl.a")
+endif()
 
 add_library(kessh SHARED kessh.cpp)
 
-target_link_libraries(kessh PUBLIC libace_napi.z.so ssh2 wolfssl)
+# Link libraries
+target_link_libraries(kessh PUBLIC 
+    libace_napi.z.so
+    libhilog_ndk.z.so
+    ssh2 
+    wolfssl
+)
