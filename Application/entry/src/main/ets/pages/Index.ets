@@ -2,7 +2,7 @@ import HistoryPage from './HistoryPage';
 import SSHNewPage from './SSHNewPage';
 import SettingsPage from './SettingsPage';
 import TitleBar from '../components/TitleBar';
-import { SSHEngine } from '../common/JvchSSH';
+import { SSHEngine } from '../common/SSHEngine';
 
 let startupProbeDone: boolean = false;
 
@@ -14,7 +14,7 @@ struct Index {
   aboutToAppear(): void {
     if (!startupProbeDone) {
       startupProbeDone = true;
-      SSHEngine.startupDiagnostic();
+      // SSHEngine.startupDiagnostic();
     }
   }
 

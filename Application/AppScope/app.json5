@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "cn.zwjkeke.ssh",
     "vendor": "zwjkeke",
-    "versionCode": 21,
-    "versionName": "1.2.1",
+    "versionCode": 26,
+    "versionName": "1.2.6",
     "icon": "$media:layered_image",
     "label": "$string:app_name"
   }
