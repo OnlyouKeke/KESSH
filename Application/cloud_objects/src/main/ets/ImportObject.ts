@@ -10,8 +10,8 @@ export interface CloudObjectLikely {
 }
 
 function mockMethod<T extends CloudObjectLikely>(target: T, version: string,
-  prop: string | symbol): (...args: unknown[]) => Promise<unknown> {
-  return async (...args: unknown[]) => new Promise((resolve, reject) => {
+  prop: string | symbol): (...args: any[]) => Promise<any> {
+  return async (...args: any[]) => new Promise((resolve, reject) => {
     cloudFunction.call({
       name: target.name,
       version: version,
@@ -29,7 +29,7 @@ function mockMethod<T extends CloudObjectLikely>(target: T, version: string,
 
 export function importObject<T extends CloudObjectLikely>(tClass: new () => T, version = '$latest'): T {
   return new Proxy<T>(new tClass(), {
-    get(target, prop): (...args: unknown[]) => Promise<unknown> {
+    get(target, prop): (...args: any[]) => Promise<any> {
       return mockMethod<T>(target, version, prop);
     }
   });
