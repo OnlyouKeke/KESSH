@@ -1,0 +1,21 @@
+{
+  "name": "websocket-test-server",
+  "version": "1.0.0",
+  "description": "Simple WebSocket server for testing HarmonyOS WebSocket client",
+  "main": "websocket_server.js",
+  "scripts": {
+    "start": "node websocket_server.js",
+    "start:ssh": "node websocket_ssh_server.js"
+  },
+  "dependencies": {
+    "ws": "^8.17.1",
+    "ssh2": "^1.15.0"
+  },
+  "keywords": [
+    "websocket",
+    "test",
+    "harmonyos"
+  ],
+  "author": "KESSH Developer",
+  "license": "MIT"
+}

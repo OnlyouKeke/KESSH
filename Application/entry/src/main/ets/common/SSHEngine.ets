@@ -5,6 +5,19 @@ const LOG_DOMAIN = 0xD15B;
 const LOG_TAG = 'SSHEngine';
 
 export class SSHEngine {
+  // 添加测试函数，不依赖libssh2
+  static testNative(): number {
+    hilog.info(LOG_DOMAIN, LOG_TAG, '[TEST] Calling testNative...');
+    try {
+      const result: number = kessh.testNative();
+      hilog.info(LOG_DOMAIN, LOG_TAG, '[TEST] testNative returned: %{public}d', result);
+      return result;
+    } catch (error) {
+      hilog.error(LOG_DOMAIN, LOG_TAG, '[TEST ERROR] testNative failed: %{public}s', String(error));
+      return -1;
+    }
+  }
+
   static openSession(host: string, port: number, user: string, pass: string): number {
     hilog.info(LOG_DOMAIN, LOG_TAG, '[STEP 1] START openSession call');
     hilog.info(LOG_DOMAIN, LOG_TAG, '[STEP 2] Parameters - host:%{public}s port:%{public}d user:%{public}s',

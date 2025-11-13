@@ -33,10 +33,13 @@ endif()
 
 add_library(kessh SHARED kessh.cpp)
 
-# Link libraries
+# Link libraries - IMPORTANT: Order matters!
+# wolfssl must come AFTER ssh2 because ssh2 depends on it
 target_link_libraries(kessh PUBLIC 
     libace_napi.z.so
     libhilog_ndk.z.so
-    ssh2 
+    ssh2
     wolfssl
+    -Wl,--whole-archive
+    -Wl,--no-whole-archive
 )

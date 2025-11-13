@@ -20,6 +20,8 @@
 static std::map<int, KesshSession*> sessions;
 static int next_session_id = 1;
 static std::mutex session_mutex;
+static bool libssh2_initialized = false;
+static std::mutex init_mutex;
 
 // Helper function for logging
 void log_info(const char* format, ...) {
@@ -50,6 +52,7 @@ static std::string get_string_arg(napi_env env, napi_value value) {
 }
 
 napi_value OpenSession(napi_env env, napi_callback_info info) {
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[C++ ENTRY] OpenSession function entered");
     log_info("[C++ STEP 1] OpenSession called");
     
     size_t argc = 4;
@@ -64,7 +67,19 @@ napi_value OpenSession(napi_env env, napi_callback_info info) {
     
     log_info("[C++ STEP 3] Parsing arguments...");
 
+    // Add null checks for safety
+    if (args[0] == nullptr || args[1] == nullptr || args[2] == nullptr || args[3] == nullptr) {
+        log_error("[C++ STEP 3.5 ERROR] One or more arguments are null");
+        napi_throw_error(env, nullptr, "Null argument detected");
+        return nullptr;
+    }
+
     std::string host = get_string_arg(env, args[0]);
+    if (host.empty()) {
+        log_error("[C++ STEP 3.6 ERROR] Host is empty");
+        napi_throw_error(env, nullptr, "Host cannot be empty");
+        return nullptr;
+    }
     int32_t port;
     napi_get_value_int32(env, args[1], &port);
     std::string user = get_string_arg(env, args[2]);
@@ -82,22 +97,47 @@ napi_value OpenSession(napi_env env, napi_callback_info info) {
     }
 
     log_info("[C++ STEP 7] Socket created: fd=%d", sock);
-    log_info("[C++ STEP 8] Using BLOCKING mode for socket");
+    log_info("[C++ STEP 8] Ensuring BLOCKING mode for socket");
 
-    // 使用阻塞模式，不设置 O_NONBLOCK
-    // Set socket timeout instead
-    struct timeval timeout;
-    timeout.tv_sec = 10;  // 10 seconds timeout
-    timeout.tv_usec = 0;
-    
-    log_info("[C++ STEP 8.1] Setting socket send timeout...");
-    if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
-        log_error("[C++ STEP 8.2 ERROR] Failed to set send timeout: %s", strerror(errno));
+    // 显式确保socket是阻塞模式
+    int flags = fcntl(sock, F_GETFL, 0);
+    if (flags < 0) {
+        log_error("[C++ STEP 8.1 ERROR] Failed to get socket flags: %s", strerror(errno));
+        close(sock);
+        napi_throw_error(env, nullptr, "Failed to get socket flags");
+        return nullptr;
     }
     
-    log_info("[C++ STEP 8.3] Setting socket receive timeout...");
+    log_info("[C++ STEP 8.1] Current socket flags: 0x%x (O_NONBLOCK=%s)", flags, (flags & O_NONBLOCK) ? "YES" : "NO");
+    
+    // 清除 O_NONBLOCK 标志，确保阻塞模式
+    if (flags & O_NONBLOCK) {
+        log_info("[C++ STEP 8.2] Socket is non-blocking, setting to blocking mode...");
+        flags &= ~O_NONBLOCK;
+        if (fcntl(sock, F_SETFL, flags) < 0) {
+            log_error("[C++ STEP 8.3 ERROR] Failed to set socket to blocking mode: %s", strerror(errno));
+            close(sock);
+            napi_throw_error(env, nullptr, "Failed to set socket to blocking mode");
+            return nullptr;
+        }
+        log_info("[C++ STEP 8.4] Socket set to BLOCKING mode successfully");
+    } else {
+        log_info("[C++ STEP 8.2] Socket is already in BLOCKING mode");
+    }
+
+    // Set socket timeout for blocking operations
+    struct timeval timeout;
+    timeout.tv_sec = 30;  // 30 seconds timeout for connect
+    timeout.tv_usec = 0;
+    
+    log_info("[C++ STEP 8.5] Setting socket send timeout...");
+    if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
+        log_error("[C++ STEP 8.6 ERROR] Failed to set send timeout: %s", strerror(errno));
+    }
+    
+    log_info("[C++ STEP 8.7] Setting socket receive timeout...");
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
-        log_error("[C++ STEP 8.4 ERROR] Failed to set receive timeout: %s", strerror(errno));
+        log_error("[C++ STEP 8.8 ERROR] Failed to set receive timeout: %s", strerror(errno));
     }
 
     log_info("[C++ STEP 9] Preparing sockaddr...");
@@ -115,7 +155,7 @@ napi_value OpenSession(napi_env env, napi_callback_info info) {
     }
 
     log_info("[C++ STEP 11] Address parsed successfully");
-    log_info("[C++ STEP 12] Attempting to connect to %s:%d (BLOCKING mode with 10s timeout)...", host.c_str(), port);
+    log_info("[C++ STEP 12] Attempting to connect to %s:%d (BLOCKING mode with 30s timeout)...", host.c_str(), port);
 
     // 阻塞模式连接，socket 已设置超时
     // 重试机制：如果被信号中断（EINTR），则重试
@@ -146,6 +186,15 @@ napi_value OpenSession(napi_env env, napi_callback_info info) {
             }
             // 继续重试
             continue;
+        } else if (errno == EINPROGRESS || errno == ETIMEDOUT) {
+            // 在设置了超时的阻塞模式下,connect()可能返回EINPROGRESS表示超时
+            // 这是因为SO_SNDTIMEO导致的,并非真正的非阻塞模式问题
+            log_error("[C++ STEP 13 ERROR] connect() timeout: %s (errno=%d)", strerror(errno), errno);
+            log_error("[C++ STEP 13.1 ERROR] Unable to reach %s:%d within timeout period", host.c_str(), port);
+            log_error("[C++ STEP 13.2 ERROR] Please check: 1) Network connectivity 2) Firewall rules 3) Server availability");
+            close(sock);
+            napi_throw_error(env, nullptr, "Connection timeout: unable to reach server");
+            return nullptr;
         } else {
             // 其他错误，不重试
             log_error("[C++ STEP 13 ERROR] connect() failed: %s (errno=%d)", strerror(errno), errno);
@@ -156,18 +205,31 @@ napi_value OpenSession(napi_env env, napi_callback_info info) {
     } while (connect_result < 0 && errno == EINTR);
 
     log_info("[C++ STEP 14] TCP connection established successfully!");
-    log_info("[C++ STEP 21] Initializing libssh2...");
-
-    // Initialize libssh2
-    int rc = libssh2_init(0);
-    if (rc != 0) {
-        log_error("[C++ STEP 22 ERROR] libssh2_init failed: rc=%d", rc);
-        close(sock);
-        napi_throw_error(env, nullptr, "Failed to initialize libssh2");
-        return nullptr;
+    log_info("[C++ STEP 21] Initializing libssh2 (lazy init)...");
+    
+    // Initialize libssh2 lazily on first use
+    {
+        std::lock_guard<std::mutex> lock(init_mutex);
+        if (!libssh2_initialized) {
+            OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[LIBSSH2 INIT] First time init");
+            log_info("[C++ STEP 22] Calling libssh2_init(0)...");
+            
+            int rc = libssh2_init(0);
+            if (rc != 0) {
+                OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, LOG_TAG, "[LIBSSH2 INIT ERROR] libssh2_init failed: rc=%d", rc);
+                log_error("[C++ STEP 23 ERROR] libssh2_init failed: rc=%d", rc);
+                close(sock);
+                napi_throw_error(env, nullptr, "Failed to initialize libssh2");
+                return nullptr;
+            }
+            libssh2_initialized = true;
+            OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[LIBSSH2 INIT SUCCESS] libssh2 initialized");
+            log_info("[C++ STEP 23] libssh2 initialized successfully (first time)");
+        } else {
+            log_info("[C++ STEP 23] libssh2 already initialized, skipping");
+        }
     }
-
-    log_info("[C++ STEP 23] libssh2 initialized successfully");
+    
     log_info("[C++ STEP 24] Creating libssh2 session...");
 
     LIBSSH2_SESSION *session = libssh2_session_init();
@@ -325,7 +387,8 @@ napi_value CloseSession(napi_env env, napi_callback_info info) {
         log_error("Session %d not found", session_id);
     }
 
-    libssh2_exit();
+    // Do not call libssh2_exit() here as it's global cleanup
+    // Only call it when the entire application is shutting down
     return nullptr;
 }
 
@@ -373,14 +436,32 @@ napi_value Read(napi_env env, napi_callback_info info) {
     if (it != sessions.end()) {
         KesshSession* kessh_session = it->second;
         if (kessh_session->channel) {
+            // 设置为非阻塞模式
+            libssh2_channel_set_blocking(kessh_session->channel, 0);
+            
             char buffer[4096];
             ssize_t n;
             int total_read = 0;
             
-            // Non-blocking read
-            while ((n = libssh2_channel_read(kessh_session->channel, buffer, sizeof(buffer))) > 0) {
-                result_str.append(buffer, n);
-                total_read += n;
+            // 非阻塞读取,读取所有可用数据
+            while (true) {
+                n = libssh2_channel_read(kessh_session->channel, buffer, sizeof(buffer));
+                
+                if (n > 0) {
+                    // 成功读取数据
+                    result_str.append(buffer, n);
+                    total_read += n;
+                } else if (n == 0) {
+                    // EOF - channel关闭
+                    break;
+                } else if (n == LIBSSH2_ERROR_EAGAIN) {
+                    // 没有更多数据可读
+                    break;
+                } else {
+                    // 其他错误
+                    log_error("Read error from session %d: %zd", session_id, n);
+                    break;
+                }
             }
             
             if (total_read > 0) {
@@ -396,20 +477,44 @@ napi_value Read(napi_env env, napi_callback_info info) {
     return result;
 }
 
+// 添加一个简单的测试函数，不依赖任何第三方库
+napi_value TestNative(napi_env env, napi_callback_info info) {
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[TEST] TestNative function called successfully!");
+    log_info("[TEST] TestNative function called successfully!");
+    
+    napi_value result;
+    napi_create_int32(env, 12345, &result);
+    return result;
+}
+
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports)
 {
-    log_info("Initializing kessh native module");
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[MODULE INIT START] Initializing kessh native module");
+    log_info("[MODULE INIT START] Initializing kessh native module");
+    
+    // DO NOT initialize libssh2 here - it may crash
+    // Initialize it lazily on first use instead
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[MODULE INIT] Skipping libssh2 initialization, will init on first use");
     
     napi_property_descriptor desc[] = {
         { "openSession", nullptr, OpenSession, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "closeSession", nullptr, CloseSession, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "write", nullptr, Write, nullptr, nullptr, nullptr, napi_default, nullptr },
-        { "read", nullptr, Read, nullptr, nullptr, nullptr, napi_default, nullptr }
+        { "read", nullptr, Read, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "testNative", nullptr, TestNative, nullptr, nullptr, nullptr, napi_default, nullptr }  // 添加测试函数
     };
-    napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
     
-    log_info("Kessh native module initialized successfully");
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[MODULE INIT] Defining properties...");
+    napi_status status = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+    
+    if (status != napi_ok) {
+        OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, LOG_TAG, "[MODULE INIT ERROR] Failed to define properties: %d", status);
+        return nullptr;
+    }
+    
+    log_info("[MODULE INIT SUCCESS] Kessh native module initialized successfully");
+    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[MODULE INIT SUCCESS] Kessh native module initialized successfully");
     return exports;
 }
 EXTERN_C_END

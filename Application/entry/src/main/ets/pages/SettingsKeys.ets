@@ -4,7 +4,7 @@ import { router } from '@kit.ArkUI';
 
 @Entry
 @Component
-export default struct SettingsKeys {
+struct SettingsKeys {
   @State keyName: string = '';
   @State keyContent: string = '';
   @State keyPublic: string = '';
@@ -13,24 +13,26 @@ export default struct SettingsKeys {
   build() {
     Column() {
       // 顶部：状态栏占位 + 标题栏（返回）
-      Blank().height(36).width('100%')
       Row() {
-        Button('<')
-          .type(ButtonType.Normal)
-          .height(36)
-          .width(36)
-          .backgroundColor('#0F000000')
-          .borderRadius(18)
-          .onClick((): void => router.back())
-        Text('密钥管理')
+        Text('<')
           .fontSize(24)
-          .fontWeight(FontWeight.Bold)
-          .margin({ left: 12 })
+          .fontWeight(FontWeight.Medium)
+          .width(40)
+          .height(40)
+          .textAlign(TextAlign.Center)
+          .onClick((): void => {
+            router.back();
+          })
+        
+        Text('密钥管理')
+          .fontSize(20)
+          .fontWeight(FontWeight.Medium)
+          .margin({ left: 4 })
         Blank().layoutWeight(1)
       }
       .height(56)
       .width('100%')
-      .padding({ left: 16, right: 16 })
+      .padding({ left: 8, right: 16 })
 
       // 表单
       Column({ space: 8 }) {
@@ -53,10 +55,9 @@ export default struct SettingsKeys {
           Blank().layoutWeight(1)
           Button('保存密钥')
             .type(ButtonType.Normal)
-            .height(44)
-            .backgroundColor('#222222')
+            .height(40)
+            .backgroundColor($r('sys.color.ohos_id_color_emphasize'))
             .fontColor(Color.White)
-            .borderRadius(12)
             .onClick((): void => {
               if (!this.keyName || !this.keyContent) { promptAction.showToast({ message: '请填写名称和私钥' }); return; }
               KeyStore.importKey(this.keyName, this.keyContent, this.keyPublic, this.keyPassphrase);

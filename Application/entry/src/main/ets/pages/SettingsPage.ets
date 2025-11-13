@@ -1,59 +1,13 @@
 import { SettingsStore } from '../common/Stores';
 import { router } from '@kit.ArkUI';
+import hilog from '@ohos.hilog';
 
 @Entry
 @Component
-export default struct SettingsPage {
-  @State darkMode: boolean = SettingsStore.darkMode;
-  @State savePassword: boolean = SettingsStore.savePassword;
-  @State showLogs: boolean = false; // legacy, not used
-
+export struct SettingsPage {
   build() {
     Column() {
       List() {
-        // 通用设置
-        ListItem() {
-          Row() {
-            Column() {
-              Text('深色模式')
-                .fontSize(16)
-              Text('跟随系统或手动切换')
-                .fontSize(12)
-                .fontColor(Color.Grey)
-            }
-            .alignItems(HorizontalAlign.Start)
-            .justifyContent(FlexAlign.Center)
-            .width('70%')
-            Blank().layoutWeight(1)
-            Toggle({ type: ToggleType.Switch, isOn: this.darkMode })
-              .onChange((v: boolean): void => { this.darkMode = v; SettingsStore.setDarkMode(v); })
-          }
-          .width('100%')
-          .height(56)
-          .padding({ left: 16, right: 16 })
-        }
-
-        ListItem() {
-          Row() {
-            Column() {
-              Text('保存密码')
-                .fontSize(16)
-              Text('使用本地安全存储')
-                .fontSize(12)
-                .fontColor(Color.Grey)
-            }
-            .alignItems(HorizontalAlign.Start)
-            .justifyContent(FlexAlign.Center)
-            .width('70%')
-            Blank().layoutWeight(1)
-            Toggle({ type: ToggleType.Switch, isOn: this.savePassword })
-              .onChange((v: boolean): void => { this.savePassword = v; SettingsStore.setSavePassword(v); })
-          }
-          .width('100%')
-          .height(56)
-          .padding({ left: 16, right: 16 })
-        }
-
         // 子页面入口
         ListItem() {
           Row() {
@@ -61,31 +15,84 @@ export default struct SettingsPage {
               .fontSize(16)
             Blank().layoutWeight(1)
             Text('>')
-              .fontColor('#66000000')
+              .fontColor($r('sys.color.ohos_id_color_fourth'))
           }
           .width('100%')
           .height(56)
           .padding({ left: 16, right: 16 })
         }
-        .onClick((): void => { router.pushUrl({ url: 'pages/SettingsKeys' }) })
-
+        .onClick((): void => { 
+          router.pushUrl({ url: 'pages/SettingsKeys' }, (err) => {
+            if (err) {
+              hilog.error(0xD15A, 'SettingsPage', 'Navigate to SettingsKeys failed: %{public}s', err.message);
+            }
+          });
+        })
+        
         ListItem() {
           Row() {
-            Text('日志')
+            Text('隐私协议')
               .fontSize(16)
             Blank().layoutWeight(1)
             Text('>')
-              .fontColor('#66000000')
+              .fontColor($r('sys.color.ohos_id_color_fourth'))
           }
           .width('100%')
           .height(56)
           .padding({ left: 16, right: 16 })
         }
-        .onClick((): void => { router.pushUrl({ url: 'pages/SettingsLogs' }) })
+        .onClick((): void => { 
+          router.pushUrl({ url: 'pages/PrivacyPolicy' });
+        })
+        
+        ListItem() {
+          Row() {
+            Text('用户协议')
+              .fontSize(16)
+            Blank().layoutWeight(1)
+            Text('>')
+              .fontColor($r('sys.color.ohos_id_color_fourth'))
+          }
+          .width('100%')
+          .height(56)
+          .padding({ left: 16, right: 16 })
+        }
+        .onClick((): void => { 
+          router.pushUrl({ url: 'pages/UserAgreement' });
+        })
+        
+        ListItem() {
+          Row() {
+            Text('问题反馈')
+              .fontSize(16)
+            Blank().layoutWeight(1)
+            Text('>')
+              .fontColor($r('sys.color.ohos_id_color_fourth'))
+          }
+          .width('100%')
+          .height(56)
+          .padding({ left: 16, right: 16 })
+        }
+        .onClick((): void => { 
+          router.pushUrl({ url: 'pages/Feedback' });
+        })
+        
+        ListItem() {
+          Row() {
+            Text('当前版本')
+              .fontSize(16)
+            Blank().layoutWeight(1)
+            Text('1.0.0')
+              .fontSize(14)
+              .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+          }
+          .width('100%')
+          .height(56)
+          .padding({ left: 16, right: 16 })
+        }
       }
       .width('100%')
       .layoutWeight(1)
-      // 已移除"保存设置"按钮，设置项即时生效
     }
     .width('100%')
     .height('100%')
