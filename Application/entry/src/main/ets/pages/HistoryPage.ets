@@ -73,7 +73,9 @@ export struct HistoryPage {
       title: '选择操作',
       buttons: [
         { text: 'SSH连接', color: '#007AFF' },
-        { text: 'SCP传输', color: '#007AFF' }
+        { text: 'SCP传输', color: '#007AFF' },
+        { text: '编辑', color: '#34C759' },
+        { text: '删除', color: '#FF3B30' }
       ]
     }).then((result) => {
       if (result.index === 0) {
@@ -87,11 +89,48 @@ export struct HistoryPage {
         };
         this.navigateToNewPage(draft);
       } else if (result.index === 1) {
-        // SCP
-        promptAction.showToast({ message: 'SCP功能待实现' });
+        // SCP传输 - 跳转到SCP页面
+        router.pushUrl({
+          url: 'pages/SCPPage',
+          params: { record: item }
+        }, (err) => {
+          if (err) {
+            promptAction.showToast({ message: `跳转失败: ${err.message}` });
+          }
+        });
+      } else if (result.index === 2) {
+        // 编辑 - 跳转到添加主机页面，填充当前信息
+        const savedPassword = ConnectionStore.getPassword(item);
+        const draft: ConnectionDraft = {
+          host: item.host,
+          port: item.port.toString(),
+          username: item.username,
+          password: savedPassword,
+          isEditing: true,
+          editingId: item.id
+        };
+        this.navigateToNewPage(draft);
+      } else if (result.index === 3) {
+        // 删除 - 二次确认
+        this.showDeleteConfirmDialog(item);
       }
     }).catch((err: Error) => {
       // 用户取消
+    });
+  }
+  
+  private showDeleteConfirmDialog(item: ConnectionRecord): void {
+    promptAction.showDialog({
+      title: '确认删除',
+      message: `确定要删除 "${item.name}" 吗？`,
+      buttons: [
+        { text: '取消', color: $r('sys.color.ohos_id_color_text_secondary') },
+        { text: '删除', color: $r('sys.color.ohos_id_color_warning') }
+      ]
+    }).then((result) => {
+      if (result.index === 1) {
+        this.deleteRecord(item.id);
+      }
     });
   }
   

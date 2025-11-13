@@ -1,5 +1,6 @@
 import hilog from '@ohos.hilog';
 import { SecurityUtils } from './SecurityUtils';
+import { AccountManager } from './AccountManager';
 import preferences from '@ohos.data.preferences';
 import type { Context } from '@kit.AbilityKit';
 
@@ -21,6 +22,8 @@ export interface ConnectionDraft {
   privateKey?: string;
   publicKey?: string;
   passphrase?: string;
+  isEditing?: boolean; // 是否为编辑模式
+  editingId?: number; // 编辑的记录ID
 }
 
 export interface ConnectionRecord {
@@ -144,13 +147,19 @@ export class SettingsStore {
   }
 }
 
+// 导入结果类型
+export interface ImportResult {
+  success: number;
+  failed: number;
+  total: number;
+}
+
 export class ConnectionStore {
   private static seq: number = 1;
   private static history: Array<ConnectionRecord> = [];
   static currentDraft: ConnectionDraft | null = null;
   private static prefStore: preferences.Preferences | null = null;
   private static initialized: boolean = false;
-  private static readonly ENCRYPTION_KEY = 'KESSH_2025_SECURE_KEY_V1'; // 加密密钥
 
   // 初始化数据库
   /**
@@ -158,7 +167,9 @@ export class ConnectionStore {
    */
   private static encryptPassword(password: string): string {
     try {
-      return SecurityUtils.aesEncrypt(password, ConnectionStore.ENCRYPTION_KEY);
+      // 使用用户ID作为加密密钥
+      const encryptionKey = AccountManager.getEncryptionKey();
+      return SecurityUtils.aesEncrypt(password, encryptionKey);
     } catch (err) {
       Logger.error(`密码加密失败: ${err}`);
       return '';
@@ -170,7 +181,9 @@ export class ConnectionStore {
    */
   private static decryptPassword(encrypted: string): string {
     try {
-      return SecurityUtils.aesDecrypt(encrypted, ConnectionStore.ENCRYPTION_KEY);
+      // 使用用户ID作为解密密钥
+      const encryptionKey = AccountManager.getEncryptionKey();
+      return SecurityUtils.aesDecrypt(encrypted, encryptionKey);
     } catch (err) {
       Logger.error(`密码解密失败: ${err}`);
       return '';
@@ -300,6 +313,145 @@ export class ConnectionStore {
       return ConnectionStore.decryptPassword(record.encryptedPassword);
     }
     return '';
+  }
+  
+  /**
+   * 导出配置文件（JSON格式）
+   */
+  static exportConfig(): string {
+    const account = AccountManager.getCurrentAccount();
+    
+    interface ConnectionExport {
+      id: number;
+      name: string;
+      host: string;
+      port: number;
+      username: string;
+      authType: AuthType;
+      encryptedPassword?: string;
+      timestamp: number;
+    }
+    
+    interface ExportData {
+      version: string;
+      exportTime: string;
+      accountId: string;
+      accountName: string;
+      connections: ConnectionExport[];
+    }
+    
+    const exportData: ExportData = {
+      version: '1.0',
+      exportTime: new Date().toISOString(),
+      accountId: account?.openId || 'anonymous',
+      accountName: account?.displayName || '未登录用户',
+      connections: ConnectionStore.history.map(record => {
+        const conn: ConnectionExport = {
+          id: record.id,
+          name: record.name,
+          host: record.host,
+          port: record.port,
+          username: record.username,
+          authType: record.authType,
+          encryptedPassword: record.encryptedPassword,
+          timestamp: record.timestamp
+        };
+        return conn;
+      })
+    };
+    
+    Logger.info(`导出配置: ${exportData.connections.length}条记录`);
+    return JSON.stringify(exportData, null, 2);
+  }
+  
+  /**
+   * 导入配置文件
+   */
+  static async importConfig(jsonContent: string): Promise<ImportResult> {
+    interface ConnectionImport {
+      id: number;
+      name: string;
+      host: string;
+      port: number;
+      username: string;
+      authType: AuthType;
+      encryptedPassword?: string;
+      timestamp: number;
+    }
+    
+    interface ImportData {
+      version: string;
+      accountName: string;
+      connections: ConnectionImport[];
+    }
+    
+    try {
+      const importData: ImportData = JSON.parse(jsonContent) as ImportData;
+      
+      // 验证数据格式
+      if (!importData.version || !importData.connections) {
+        throw new Error('无效的配置文件格式');
+      }
+      
+      const account = AccountManager.getCurrentAccount();
+      
+      Logger.info(`导入配置: 来源账号=${importData.accountName}, 当前账号=${account?.displayName || '未登录'}`);
+      
+      let successCount = 0;
+      let failedCount = 0;
+      
+      for (const conn of importData.connections) {
+        try {
+          // 检查是否已存在
+          const existingIndex = ConnectionStore.history.findIndex(r => 
+            r.host === conn.host && 
+            r.port === conn.port && 
+            r.username === conn.username
+          );
+          
+          const record: ConnectionRecord = {
+            id: existingIndex >= 0 ? ConnectionStore.history[existingIndex].id : ConnectionStore.seq++,
+            name: conn.name,
+            host: conn.host,
+            port: conn.port,
+            username: conn.username,
+            authType: conn.authType,
+            time: ConnectionStore.formatTime(new Date(conn.timestamp)),
+            timestamp: conn.timestamp,
+            encryptedPassword: conn.encryptedPassword
+          };
+          
+          // 如果存在相同配置，删除旧的
+          if (existingIndex >= 0) {
+            ConnectionStore.history.splice(existingIndex, 1);
+          }
+          
+          ConnectionStore.history.unshift(record);
+          successCount++;
+          
+        } catch (err) {
+          Logger.error(`导入单条记录失败: ${err}`);
+          failedCount++;
+        }
+      }
+      
+      // 保存到数据库
+      await ConnectionStore.save();
+      
+      Logger.info(`导入完成: 成功${successCount}条, 失败${failedCount}条`);
+      
+      const result: ImportResult = {
+        success: successCount,
+        failed: failedCount,
+        total: importData.connections.length
+      };
+      return result;
+      
+    } catch (err) {
+      const error = err as Error;
+      Logger.error(`导入配置失败: ${error.message}`);
+      throw new Error(`导入失败: ${error.message}`);
+    }
   }
   
   static formatTime(date: Date): string {

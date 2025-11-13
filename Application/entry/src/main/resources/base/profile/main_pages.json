@@ -5,6 +5,7 @@
     "pages/SSHNewPage",
     "pages/SettingsPage",
     "pages/Terminal",
+    "pages/SCPPage",
     "pages/SettingsKeys",
     "pages/SettingsLogs",
     "pages/PrivacyPolicy",

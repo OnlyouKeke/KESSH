@@ -27,6 +27,8 @@ export struct SSHNewPage {
   @State authType: string = 'password';
   @State saveToHistory: boolean = true;
   @State savePassword: boolean = false;
+  @State isEditMode: boolean = false;
+  @State editingId: number = -1;
 
   aboutToAppear(): void {
     const draft = ConnectionStore.currentDraft;
@@ -38,6 +40,11 @@ export struct SSHNewPage {
       // 如果从历史记录带来了密码，自动勾选保存密码
       if (draft.password) {
         this.savePassword = true;
+      }
+      // 检查是否为编辑模式
+      if (draft.isEditing && draft.editingId) {
+        this.isEditMode = true;
+        this.editingId = draft.editingId;
       }
     }
   }
@@ -81,8 +88,16 @@ export struct SSHNewPage {
     // 直接保存到历史
     if (this.saveToHistory) {
       try {
-        ConnectionStore.addFromDraft(draft, auth, undefined, undefined, undefined, this.savePassword);
-        promptAction.showToast({ message: '保存成功' });
+        if (this.isEditMode && this.editingId > 0) {
+          // 编辑模式：先删除旧记录，再添加新记录
+          ConnectionStore.remove(this.editingId);
+          ConnectionStore.addFromDraft(draft, auth, undefined, undefined, undefined, this.savePassword);
+          promptAction.showToast({ message: '更新成功' });
+        } else {
+          // 新建模式
+          ConnectionStore.addFromDraft(draft, auth, undefined, undefined, undefined, this.savePassword);
+          promptAction.showToast({ message: '保存成功' });
+        }
         // 跳转到首页而不是返回
         router.replaceUrl({ url: 'pages/Index' });
       } catch (err) {
@@ -231,7 +246,7 @@ export struct SSHNewPage {
         }
 
         Row({ space: 12 }) {
-          Button('保存')
+          Button(this.isEditMode ? '更新' : '保存')
             .type(ButtonType.Normal)
             .layoutWeight(1)
             .height(48)

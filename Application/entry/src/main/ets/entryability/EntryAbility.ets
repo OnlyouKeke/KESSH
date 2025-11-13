@@ -2,6 +2,7 @@ import { ConfigurationConstant, UIAbility } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { ConnectionStore } from '../common/Stores';
+import { AccountManager } from '../common/AccountManager';
 
 const HILOG_DOMAIN = 0x0000;
 const TAG = '[EntryAbility]';
@@ -14,11 +15,16 @@ export default class EntryAbility extends UIAbility {
       hilog.error(HILOG_DOMAIN, TAG, 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
     }
     
-    // 初始化ConnectionStore
-    ConnectionStore.init(this.context).then(() => {
+    // 初始化AccountManager
+    AccountManager.init(this.context).then(() => {
+      hilog.info(HILOG_DOMAIN, TAG, 'AccountManager initialized');
+      
+      // 初始化ConnectionStore
+      return ConnectionStore.init(this.context);
+    }).then(() => {
       hilog.info(HILOG_DOMAIN, TAG, 'ConnectionStore initialized');
     }).catch((err: Error) => {
-      hilog.error(HILOG_DOMAIN, TAG, 'Failed to init ConnectionStore: %{public}s', JSON.stringify(err));
+      hilog.error(HILOG_DOMAIN, TAG, 'Failed to init: %{public}s', JSON.stringify(err));
     });
     
     hilog.info(HILOG_DOMAIN, TAG, '%{public}s', 'Ability onCreate');
