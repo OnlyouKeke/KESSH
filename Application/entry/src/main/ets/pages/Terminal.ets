@@ -176,7 +176,7 @@ struct Terminal {
           .height(40)
           .textAlign(TextAlign.Center)
           .onClick((): void => {
-            router.back();
+            router.replaceUrl({ url: 'pages/Index' });
           })
         
         Text('终端')

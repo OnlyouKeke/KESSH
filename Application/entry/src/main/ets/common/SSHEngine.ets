@@ -83,4 +83,66 @@ export class SSHEngine {
       return '';
     }
   }
+
+  /**
+   * 执行SSH命令并返回结果
+   */
+  static executeCommand(sessionId: number, command: string): string {
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'Executing command: %{public}s', command);
+    try {
+      const result: string = kessh.executeCommand(sessionId, command);
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'Command executed successfully');
+      return result;
+    } catch (error) {
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'Failed to execute command: %{public}s', String(error));
+      return '';
+    }
+  }
+
+  /**
+   * 列出远程目录下的文件
+   */
+  static listFiles(sessionId: number, remotePath: string): string {
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'Listing files in: %{public}s', remotePath);
+    try {
+      // 使用ls -la命令获取详细信息
+      const command = `ls -la "${remotePath}" 2>&1`;
+      return SSHEngine.executeCommand(sessionId, command);
+    } catch (error) {
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'Failed to list files: %{public}s', String(error));
+      return '';
+    }
+  }
+
+  /**
+   * 下载远程文件
+   */
+  static downloadFile(sessionId: number, remotePath: string): string {
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'Downloading file: %{public}s', remotePath);
+    try {
+      const content: string = kessh.downloadFile(sessionId, remotePath);
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'File downloaded successfully, size: %{public}d bytes', content.length);
+      return content;
+    } catch (error) {
+      const err = error as Error;
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'Failed to download file: %{public}s', err.message);
+      throw new Error(`下载文件失败: ${err.message}`);
+    }
+  }
+
+  /**
+   * 上传文件到远程
+   */
+  static uploadFile(sessionId: number, remotePath: string, content: string): number {
+    hilog.info(LOG_DOMAIN, LOG_TAG, 'Uploading file to: %{public}s, size: %{public}d bytes', remotePath, content.length);
+    try {
+      const bytesWritten: number = kessh.uploadFile(sessionId, remotePath, content);
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'File uploaded successfully, %{public}d bytes written', bytesWritten);
+      return bytesWritten;
+    } catch (error) {
+      const err = error as Error;
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'Failed to upload file: %{public}s', err.message);
+      throw new Error(`上传文件失败: ${err.message}`);
+    }
+  }
 }

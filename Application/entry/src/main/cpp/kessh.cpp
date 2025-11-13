@@ -487,6 +487,271 @@ napi_value TestNative(napi_env env, napi_callback_info info) {
     return result;
 }
 
+// 执行SSH命令并返回结果
+napi_value ExecuteCommand(napi_env env, napi_callback_info info) {
+    log_info("ExecuteCommand called");
+    
+    size_t argc = 2;
+    napi_value args[2];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    if (argc != 2) {
+        napi_throw_error(env, nullptr, "Invalid arguments count");
+        return nullptr;
+    }
+
+    int32_t session_id;
+    napi_get_value_int32(env, args[0], &session_id);
+    std::string command = get_string_arg(env, args[1]);
+
+    log_info("Executing command on session %d: %s", session_id, command.c_str());
+
+    std::string result_str;
+    std::lock_guard<std::mutex> lock(session_mutex);
+    auto it = sessions.find(session_id);
+    
+    if (it == sessions.end()) {
+        log_error("Session %d not found", session_id);
+        napi_throw_error(env, nullptr, "Session not found");
+        return nullptr;
+    }
+
+    KesshSession* kessh_session = it->second;
+    if (!kessh_session->session) {
+        log_error("Invalid session object");
+        napi_throw_error(env, nullptr, "Invalid session");
+        return nullptr;
+    }
+
+    // 打开exec channel
+    LIBSSH2_CHANNEL *channel = libssh2_channel_open_session(kessh_session->session);
+    if (!channel) {
+        char *errmsg;
+        int errlen;
+        libssh2_session_last_error(kessh_session->session, &errmsg, &errlen, 0);
+        log_error("Failed to open exec channel: %.*s", errlen, errmsg);
+        napi_throw_error(env, nullptr, "Failed to open channel");
+        return nullptr;
+    }
+
+    log_info("Exec channel opened, executing command...");
+
+    // 执行命令
+    if (libssh2_channel_exec(channel, command.c_str())) {
+        char *errmsg;
+        int errlen;
+        libssh2_session_last_error(kessh_session->session, &errmsg, &errlen, 0);
+        log_error("Failed to execute command: %.*s", errlen, errmsg);
+        libssh2_channel_free(channel);
+        napi_throw_error(env, nullptr, "Failed to execute command");
+        return nullptr;
+    }
+
+    // 读取命令输出
+    char buffer[4096];
+    ssize_t n;
+    int total_read = 0;
+
+    while (true) {
+        n = libssh2_channel_read(channel, buffer, sizeof(buffer));
+        
+        if (n > 0) {
+            result_str.append(buffer, n);
+            total_read += n;
+        } else if (n == 0) {
+            // EOF
+            break;
+        } else if (n == LIBSSH2_ERROR_EAGAIN) {
+            // 需要等待
+            usleep(10000); // 10ms
+            continue;
+        } else {
+            log_error("Read error: %zd", n);
+            break;
+        }
+    }
+
+    // 读取stderr
+    while (true) {
+        n = libssh2_channel_read_stderr(channel, buffer, sizeof(buffer));
+        
+        if (n > 0) {
+            result_str.append(buffer, n);
+            total_read += n;
+        } else if (n == 0 || n == LIBSSH2_ERROR_EAGAIN) {
+            break;
+        } else {
+            break;
+        }
+    }
+
+    log_info("Command executed, read %d bytes", total_read);
+
+    // 关闭并释放channel
+    libssh2_channel_close(channel);
+    libssh2_channel_free(channel);
+
+    napi_value result;
+    napi_create_string_utf8(env, result_str.c_str(), result_str.length(), &result);
+    return result;
+}
+
+// 下载文件（读取远程文件内容）
+napi_value DownloadFile(napi_env env, napi_callback_info info) {
+    log_info("DownloadFile called");
+    
+    size_t argc = 2;
+    napi_value args[2];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    if (argc != 2) {
+        napi_throw_error(env, nullptr, "Invalid arguments count");
+        return nullptr;
+    }
+
+    int32_t session_id;
+    napi_get_value_int32(env, args[0], &session_id);
+    std::string remote_path = get_string_arg(env, args[1]);
+
+    log_info("Downloading file from session %d: %s", session_id, remote_path.c_str());
+
+    std::lock_guard<std::mutex> lock(session_mutex);
+    auto it = sessions.find(session_id);
+    
+    if (it == sessions.end()) {
+        log_error("Session %d not found", session_id);
+        napi_throw_error(env, nullptr, "Session not found");
+        return nullptr;
+    }
+
+    KesshSession* kessh_session = it->second;
+    
+    // 使用cat命令读取文件
+    std::string command = "cat \"" + remote_path + "\" 2>&1";
+    LIBSSH2_CHANNEL *channel = libssh2_channel_open_session(kessh_session->session);
+    
+    if (!channel) {
+        napi_throw_error(env, nullptr, "Failed to open channel");
+        return nullptr;
+    }
+
+    if (libssh2_channel_exec(channel, command.c_str())) {
+        libssh2_channel_free(channel);
+        napi_throw_error(env, nullptr, "Failed to execute cat command");
+        return nullptr;
+    }
+
+    // 读取文件内容
+    std::string file_content;
+    char buffer[8192];
+    ssize_t n;
+
+    while (true) {
+        n = libssh2_channel_read(channel, buffer, sizeof(buffer));
+        
+        if (n > 0) {
+            file_content.append(buffer, n);
+        } else if (n == 0) {
+            break;
+        } else if (n == LIBSSH2_ERROR_EAGAIN) {
+            usleep(10000);
+            continue;
+        } else {
+            break;
+        }
+    }
+
+    libssh2_channel_close(channel);
+    libssh2_channel_free(channel);
+
+    log_info("Downloaded %zu bytes from %s", file_content.length(), remote_path.c_str());
+
+    napi_value result;
+    napi_create_string_utf8(env, file_content.c_str(), file_content.length(), &result);
+    return result;
+}
+
+// 上传文件（写入远程文件）
+napi_value UploadFile(napi_env env, napi_callback_info info) {
+    log_info("UploadFile called");
+    
+    size_t argc = 3;
+    napi_value args[3];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    if (argc != 3) {
+        napi_throw_error(env, nullptr, "Invalid arguments count");
+        return nullptr;
+    }
+
+    int32_t session_id;
+    napi_get_value_int32(env, args[0], &session_id);
+    std::string remote_path = get_string_arg(env, args[1]);
+    std::string content = get_string_arg(env, args[2]);
+
+    log_info("Uploading %zu bytes to session %d: %s", content.length(), session_id, remote_path.c_str());
+
+    std::lock_guard<std::mutex> lock(session_mutex);
+    auto it = sessions.find(session_id);
+    
+    if (it == sessions.end()) {
+        log_error("Session %d not found", session_id);
+        napi_throw_error(env, nullptr, "Session not found");
+        return nullptr;
+    }
+
+    KesshSession* kessh_session = it->second;
+    
+    // 使用临时文件和base64编码传输
+    // 先创建临时文件，然后写入内容
+    std::string temp_file = "/tmp/kessh_upload_" + std::to_string(time(nullptr));
+    std::string command = "cat > \"" + remote_path + "\"";
+    
+    LIBSSH2_CHANNEL *channel = libssh2_channel_open_session(kessh_session->session);
+    
+    if (!channel) {
+        napi_throw_error(env, nullptr, "Failed to open channel");
+        return nullptr;
+    }
+
+    if (libssh2_channel_exec(channel, command.c_str())) {
+        libssh2_channel_free(channel);
+        napi_throw_error(env, nullptr, "Failed to execute cat command");
+        return nullptr;
+    }
+
+    // 写入文件内容
+    size_t total_written = 0;
+    while (total_written < content.length()) {
+        ssize_t written = libssh2_channel_write(channel, 
+            content.c_str() + total_written, 
+            content.length() - total_written);
+        
+        if (written > 0) {
+            total_written += written;
+        } else if (written == LIBSSH2_ERROR_EAGAIN) {
+            usleep(10000);
+            continue;
+        } else {
+            log_error("Write error: %zd", written);
+            libssh2_channel_free(channel);
+            napi_throw_error(env, nullptr, "Failed to write file content");
+            return nullptr;
+        }
+    }
+
+    // 发送EOF并关闭
+    libssh2_channel_send_eof(channel);
+    libssh2_channel_close(channel);
+    libssh2_channel_free(channel);
+
+    log_info("Uploaded %zu bytes to %s", total_written, remote_path.c_str());
+
+    napi_value result;
+    napi_create_int32(env, total_written, &result);
+    return result;
+}
+
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports)
 {
@@ -502,7 +767,10 @@ static napi_value Init(napi_env env, napi_value exports)
         { "closeSession", nullptr, CloseSession, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "write", nullptr, Write, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "read", nullptr, Read, nullptr, nullptr, nullptr, napi_default, nullptr },
-        { "testNative", nullptr, TestNative, nullptr, nullptr, nullptr, napi_default, nullptr }  // 添加测试函数
+        { "executeCommand", nullptr, ExecuteCommand, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "downloadFile", nullptr, DownloadFile, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "uploadFile", nullptr, UploadFile, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "testNative", nullptr, TestNative, nullptr, nullptr, nullptr, napi_default, nullptr }
     };
     
     OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[MODULE INIT] Defining properties...");

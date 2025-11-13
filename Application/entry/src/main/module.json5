@@ -32,9 +32,18 @@
         ]
       }
     ],
+    "metadata": [ // 配置信息如下
+      {
+        "name": "6917586480555789631",
+        "value": "25f8da57ec643503e94efa58b221354427948cc3a73149ebeb6d080e28fdfc40"
+      }
+    ],
     "requestPermissions": [
       {
         "name": "ohos.permission.INTERNET"
+      },
+      {
+        "name": "ohos.permission.GET_NETWORK_INFO"
       }
     ]
   }
