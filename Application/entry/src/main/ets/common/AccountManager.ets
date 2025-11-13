@@ -64,26 +64,39 @@ export class AccountManager {
         throw new Error('登录失败：未获取到授权数据');
       }
 
-      // 获取授权码（使用类型断言）
-      const authorizationCode = (authResponse as ESObject).authorizationCode as string;
-      if (!authorizationCode) {
-        throw new Error('登录失败：未获取到授权码');
-      }
-
       // 获取用户信息
       const responseData: Record<string, Object> = authResponse as Record<string, Object>;
+      
+      // 华为账号返回的数据结构：{ data: { openID, unionID, nickName, ... }, state: ... }
+      const data = responseData['data'] as Record<string, Object>;
+      
+      if (!data) {
+        Logger.error(`AccountManager: 响应数据: ${JSON.stringify(responseData)}`);
+        throw new Error('登录失败：响应数据格式错误');
+      }
+      
+      // 检查是否有用户信息（注意字段名：openID, unionID, nickName）
+      const openId = data['openID'] as string;
+      const displayName = data['nickName'] as string;
+      const unionId = data['unionID'] as string;
+      
+      if (!openId) {
+        Logger.error(`AccountManager: 用户数据: ${JSON.stringify(data)}`);
+        throw new Error('登录失败：未获取到用户ID');
+      }
+      
       const account: HuaweiAccount = {
-        openId: (responseData['openId'] as string) || '',
-        displayName: (responseData['displayName'] as string) || '华为用户',
-        avatarUri: responseData['avatarUri'] as string,
-        unionId: responseData['unionId'] as string
+        openId: openId,
+        displayName: displayName || '华为用户',
+        avatarUri: data['avatarUri'] as string,
+        unionId: unionId
       };
 
       // 保存账号信息
       AccountManager.currentAccount = account;
       await AccountManager.saveAccount();
 
-      Logger.info(`AccountManager: 登录成功 ${account.displayName}`);
+      Logger.info(`AccountManager: 登录成功 ${account.displayName} (${account.openId})`);
       return account;
     } catch (err) {
       const error = err as Error;
@@ -112,18 +125,22 @@ export class AccountManager {
       
       if (authResponse) {
         const responseData: Record<string, Object> = authResponse as Record<string, Object>;
-        const account: HuaweiAccount = {
-          openId: (responseData['openId'] as string) || AccountManager.currentAccount.openId,
-          displayName: (responseData['displayName'] as string) || AccountManager.currentAccount.displayName,
-          avatarUri: (responseData['avatarUri'] as string) || AccountManager.currentAccount.avatarUri,
-          unionId: (responseData['unionId'] as string) || AccountManager.currentAccount.unionId
-        };
-
-        AccountManager.currentAccount = account;
-        await AccountManager.saveAccount();
+        const data = responseData['data'] as Record<string, Object>;
         
-        Logger.info('AccountManager: 静默登录成功');
-        return account;
+        if (data) {
+          const account: HuaweiAccount = {
+            openId: (data['openID'] as string) || AccountManager.currentAccount.openId,
+            displayName: (data['nickName'] as string) || AccountManager.currentAccount.displayName,
+            avatarUri: (data['avatarUri'] as string) || AccountManager.currentAccount.avatarUri,
+            unionId: (data['unionID'] as string) || AccountManager.currentAccount.unionId
+          };
+
+          AccountManager.currentAccount = account;
+          await AccountManager.saveAccount();
+          
+          Logger.info('AccountManager: 静默登录成功');
+          return account;
+        }
       }
       
       return AccountManager.currentAccount;
