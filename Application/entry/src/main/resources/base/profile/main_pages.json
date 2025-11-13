@@ -6,6 +6,11 @@
     "pages/SettingsPage",
     "pages/Terminal",
     "pages/SettingsKeys",
-    "pages/SettingsLogs"
+    "pages/SettingsLogs",
+    "pages/PrivacyPolicy",
+    "pages/UserAgreement",
+    "pages/Feedback",
+    "pages/WebSocketTestPage",
+    "pages/WebSocketSSHTestPage"
   ]
 }

@@ -2,8 +2,8 @@
 	"app": {
 		"bundleName": "cn.zwjkeke.ssh",
 		"debug": true,
-		"versionCode": 13,
-		"versionName": "1.1.3",
+		"versionCode": 222,
+		"versionName": "1.2.22",
 		"minAPIVersion": 50100018,
 		"targetAPIVersion": 60000020,
 		"apiReleaseType": "Release",

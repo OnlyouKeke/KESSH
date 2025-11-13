@@ -1,6 +1,6 @@
-import HistoryPage from './HistoryPage';
-import SSHNewPage from './SSHNewPage';
-import SettingsPage from './SettingsPage';
+import { HistoryPage } from './HistoryPage';
+import { SSHNewPage } from './SSHNewPage';
+import { SettingsPage } from './SettingsPage';
 import TitleBar from '../components/TitleBar';
 import { SSHEngine } from '../common/SSHEngine';
 
@@ -24,7 +24,7 @@ struct Index {
       Blank().height(36).width('100%')
 
       // 一级界面标题栏（56vp）：首页不显示标题，移除右侧两个按钮
-      TitleBar({ title: this.currentIndex === 0 ? '' : (this.currentIndex === 1 ? '连接' : '设置'), showActions: false })
+      TitleBar({ title: this.currentIndex === 0 ? '' : (this.currentIndex === 1 ? '添加主机' : '设置'), showActions: false })
 
       // 内容区：底部 Tab
       Tabs({ index: this.currentIndex }) {
@@ -36,7 +36,10 @@ struct Index {
         TabContent() {
           SSHNewPage()
         }
-        .tabBar({ text: '连接' })
+        .tabBar({ 
+          icon: $r('sys.symbol.plus_circle'),
+          text: '添加主机'
+        })
 
         TabContent() {
           SettingsPage()

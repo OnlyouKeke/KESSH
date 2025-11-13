@@ -19,4 +19,7 @@ napi_value CloseSession(napi_env env, napi_callback_info info);
 napi_value Write(napi_env env, napi_callback_info info);
 napi_value Read(napi_env env, napi_callback_info info);
 
+// Test function
+napi_value TestNative(napi_env env, napi_callback_info info);
+
 #endif // KESSH_H
