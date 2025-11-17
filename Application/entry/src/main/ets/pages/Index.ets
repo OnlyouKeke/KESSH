@@ -1,6 +1,7 @@
 import { HistoryPage } from './HistoryPage';
 import { SSHNewPage } from './SSHNewPage';
 import { SettingsPage } from './SettingsPage';
+import { ToolsPage } from './ToolsPage';
 import TitleBar from '../components/TitleBar';
 import { SSHEngine } from '../common/SSHEngine';
 
@@ -24,7 +25,8 @@ struct Index {
       Blank().height(36).width('100%')
 
       // 一级界面标题栏（56vp）：首页不显示标题，移除右侧两个按钮
-      TitleBar({ title: this.currentIndex === 0 ? '' : (this.currentIndex === 1 ? '添加主机' : '设置'), showActions: false })
+      const titles: Array<string> = ['', '添加主机', '工具箱', '设置'];
+      TitleBar({ title: titles[this.currentIndex] || '', showActions: false })
 
       // 内容区：底部 Tab
       Tabs({ index: this.currentIndex }) {
@@ -36,10 +38,15 @@ struct Index {
         TabContent() {
           SSHNewPage()
         }
-        .tabBar({ 
+        .tabBar({
           icon: $r('sys.symbol.plus_circle'),
           text: '添加主机'
         })
+
+        TabContent() {
+          ToolsPage()
+        }
+        .tabBar({ text: '工具箱' })
 
         TabContent() {
           SettingsPage()

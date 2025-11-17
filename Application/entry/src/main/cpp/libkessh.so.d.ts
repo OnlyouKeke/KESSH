@@ -1,7 +1,13 @@
 /**
- * Native SSH module interface
+ * Native SSH and network helper module interface
  */
 export const openSession: (host: string, port: number, user: string, pass: string) => number;
 export const closeSession: (sessionId: number) => void;
 export const write: (sessionId: number, data: string) => void;
 export const read: (sessionId: number) => string;
+export const executeCommand: (sessionId: number, command: string) => string;
+export const downloadFile: (sessionId: number, remotePath: string) => string;
+export const uploadFile: (sessionId: number, remotePath: string, content: string) => number;
+export const testNative: () => number;
+export const pingHost: (host: string, count?: number) => string;
+export const traceRoute: (host: string, maxHops?: number) => string;
