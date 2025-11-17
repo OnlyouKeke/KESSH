@@ -10,6 +10,9 @@
 #include <mutex>
 #include <cstring>
 #include <cstdarg>
+#include <cstdio>
+#include <cctype>
+#include <vector>
 #include <hilog/log.h>
 
 #undef LOG_DOMAIN
@@ -49,6 +52,62 @@ static std::string get_string_arg(napi_env env, napi_value value) {
     std::string str(len, 0);
     napi_get_value_string_utf8(env, value, &str[0], len + 1, &len);
     return str;
+}
+
+static bool is_valid_host(const std::string &host)
+{
+    if (host.empty()) {
+        return false;
+    }
+    for (char c : host) {
+        unsigned char ch = static_cast<unsigned char>(c);
+        if (!(std::isalnum(ch) || c == '.' || c == '-' || c == ':' )) {
+            return false;
+        }
+    }
+    return true;
+}
+
+struct CommandCandidate {
+    std::string binary;      // Binary path used for availability checks
+    std::string invocation;  // Actual command string that should be executed
+};
+
+static bool is_command_available(const CommandCandidate &candidate)
+{
+    if (candidate.binary.empty()) {
+        // Cannot verify availability, assume it can be resolved from PATH
+        return true;
+    }
+    return access(candidate.binary.c_str(), X_OK) == 0;
+}
+
+static std::string select_command(const std::vector<CommandCandidate> &candidates, const std::string &args)
+{
+    for (const auto &candidate : candidates) {
+        if (is_command_available(candidate)) {
+            return candidate.invocation + " " + args;
+        }
+    }
+    return "";
+}
+
+static std::string run_shell_command(const std::string &command)
+{
+    std::string output;
+    FILE *pipe = popen(command.c_str(), "r");
+    if (!pipe) {
+        output = "无法执行命令: " + command + "\n";
+        output += "请确认设备支持相关工具";
+        return output;
+    }
+    char buffer[512];
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        output += buffer;
+    }
+    int status = pclose(pipe);
+    output += "\n(退出状态: " + std::to_string(status) + ")";
+    return output;
 }
 
 napi_value OpenSession(napi_env env, napi_callback_info info) {
@@ -752,6 +811,116 @@ napi_value UploadFile(napi_env env, napi_callback_info info) {
     return result;
 }
 
+napi_value PingHost(napi_env env, napi_callback_info info)
+{
+    size_t argc = 2;
+    napi_value args[2];
+    napi_status status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    if (status != napi_ok || argc < 1) {
+        napi_throw_error(env, nullptr, "PingHost: invalid arguments");
+        return nullptr;
+    }
+
+    std::string host = get_string_arg(env, args[0]);
+    if (!is_valid_host(host)) {
+        napi_throw_error(env, nullptr, "PingHost: invalid host");
+        return nullptr;
+    }
+
+    int32_t count = 4;
+    if (argc >= 2) {
+        napi_get_value_int32(env, args[1], &count);
+    }
+    if (count <= 0) {
+        count = 4;
+    }
+    if (count > 10) {
+        count = 10;
+    }
+
+    std::string args = "-c " + std::to_string(count) + " " + host + " 2>&1";
+    std::vector<CommandCandidate> candidates = {
+        {"/system/bin/ping", "/system/bin/ping"},
+        {"/system/bin/toybox", "/system/bin/toybox ping"},
+        {"", "toybox ping"},
+        {"", "ping"}
+    };
+
+    std::string command = select_command(candidates, args);
+    if (command.empty()) {
+        std::string message = "未找到可用的 ping 命令，请确认系统是否包含 ping/toybox";
+        napi_value fallback_value;
+        napi_create_string_utf8(env, message.c_str(), message.length(), &fallback_value);
+        return fallback_value;
+    }
+
+    std::string result = run_shell_command(command);
+
+    napi_value return_value;
+    napi_create_string_utf8(env, result.c_str(), result.length(), &return_value);
+    return return_value;
+}
+
+napi_value TraceRoute(napi_env env, napi_callback_info info)
+{
+    size_t argc = 2;
+    napi_value args[2];
+    napi_status status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    if (status != napi_ok || argc < 1) {
+        napi_throw_error(env, nullptr, "TraceRoute: invalid arguments");
+        return nullptr;
+    }
+
+    std::string host = get_string_arg(env, args[0]);
+    if (!is_valid_host(host)) {
+        napi_throw_error(env, nullptr, "TraceRoute: invalid host");
+        return nullptr;
+    }
+
+    int32_t max_hops = 20;
+    if (argc >= 2) {
+        napi_get_value_int32(env, args[1], &max_hops);
+    }
+    if (max_hops <= 0) {
+        max_hops = 20;
+    }
+    if (max_hops > 64) {
+        max_hops = 64;
+    }
+
+    std::vector<CommandCandidate> traceroute_candidates = {
+        {"/system/bin/traceroute", "/system/bin/traceroute"},
+        {"/system/bin/toybox", "/system/bin/toybox traceroute"},
+        {"", "toybox traceroute"},
+        {"", "traceroute"}
+    };
+    std::vector<CommandCandidate> tracepath_candidates = {
+        {"/system/bin/tracepath", "/system/bin/tracepath"},
+        {"/system/bin/toybox", "/system/bin/toybox tracepath"},
+        {"", "toybox tracepath"},
+        {"", "tracepath"}
+    };
+
+    std::string args = host + " 2>&1";
+    std::string command = select_command(traceroute_candidates, "-m " + std::to_string(max_hops) + " " + args);
+    if (command.empty()) {
+        command = select_command(tracepath_candidates, args);
+    }
+
+    if (command.empty()) {
+        std::string message = "未找到 traceroute/tracepath 命令，请确认系统是否包含对应网络诊断工具";
+        napi_value fallback_value;
+        napi_create_string_utf8(env, message.c_str(), message.length(), &fallback_value);
+        return fallback_value;
+    }
+
+    std::string result = run_shell_command(command);
+
+    napi_value return_value;
+    napi_create_string_utf8(env, result.c_str(), result.length(), &return_value);
+    return return_value;
+}
+
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports)
 {
@@ -770,7 +939,9 @@ static napi_value Init(napi_env env, napi_value exports)
         { "executeCommand", nullptr, ExecuteCommand, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "downloadFile", nullptr, DownloadFile, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "uploadFile", nullptr, UploadFile, nullptr, nullptr, nullptr, napi_default, nullptr },
-        { "testNative", nullptr, TestNative, nullptr, nullptr, nullptr, napi_default, nullptr }
+        { "testNative", nullptr, TestNative, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "pingHost", nullptr, PingHost, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "traceRoute", nullptr, TraceRoute, nullptr, nullptr, nullptr, napi_default, nullptr }
     };
     
     OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[MODULE INIT] Defining properties...");
