@@ -1,7 +1,8 @@
-import { promptAction } from '@kit.ArkUI';
+import { promptAction, CopyOptions } from '@kit.ArkUI';
 import { taskpool } from '@kit.ArkTS';
 import socket from '@ohos.net.socket';
 import util from '@ohos.util';
+import clipboard from '@ohos.miscservices.clipboard';
 import kessh from 'libkessh.so';
 
 const base64Helper: util.Base64Helper = new util.Base64Helper();
@@ -40,6 +41,39 @@ export struct ToolsPage {
   @State portResult: string = '';
   @State portLoading: boolean = false;
 
+  private formatTimestamp(): string {
+    const date = new Date();
+    const pad = (value: number): string => value.toString().padStart(2, '0');
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }
+
+  private async copyResult(result: string, label: string): Promise<void> {
+    if (!result) {
+      promptAction.showToast({ message: `暂无可复制的${label}结果` });
+      return;
+    }
+    try {
+      const systemClipboard = clipboard.getSystemClipboard();
+      await systemClipboard.setData({ textData: result });
+      promptAction.showToast({ message: `${label}结果已复制` });
+    } catch (err) {
+      const error = err as Error;
+      promptAction.showToast({ message: `复制失败: ${error.message}` });
+    }
+  }
+
+  private clearPingResult(): void {
+    this.pingResult = '';
+  }
+
+  private clearTraceResult(): void {
+    this.traceResult = '';
+  }
+
+  private clearPortResult(): void {
+    this.portResult = '';
+  }
+
   private normalizeHost(input: string): string {
     return (input || '').trim();
   }
@@ -58,14 +92,14 @@ export struct ToolsPage {
       count = 10;
     }
     this.pingLoading = true;
-    this.pingResult = '正在测试...';
+    this.pingResult = `[${this.formatTimestamp()}] 正在测试...`;
     try {
       const task = new taskpool.Task(runPing, host, count);
       const output = await taskpool.execute(task) as string;
-      this.pingResult = output;
+      this.pingResult = `[${this.formatTimestamp()}]\n${output}`;
     } catch (err) {
       const error = err as Error;
-      this.pingResult = `Ping 执行失败: ${error.message}`;
+      this.pingResult = `[${this.formatTimestamp()}] Ping 执行失败: ${error.message}`;
     } finally {
       this.pingLoading = false;
     }
@@ -85,14 +119,14 @@ export struct ToolsPage {
       maxHops = 64;
     }
     this.traceLoading = true;
-    this.traceResult = '正在探测路径...';
+    this.traceResult = `[${this.formatTimestamp()}] 正在探测路径...`;
     try {
       const task = new taskpool.Task(runTrace, host, maxHops);
       const output = await taskpool.execute(task) as string;
-      this.traceResult = output;
+      this.traceResult = `[${this.formatTimestamp()}]\n${output}`;
     } catch (err) {
       const error = err as Error;
-      this.traceResult = `Tracert 执行失败: ${error.message}`;
+      this.traceResult = `[${this.formatTimestamp()}] Tracert 执行失败: ${error.message}`;
     } finally {
       this.traceLoading = false;
     }
@@ -102,10 +136,10 @@ export struct ToolsPage {
     try {
       const encoded = base64Helper.encodeToStringSync(textEncoder.encodeInto(this.base64Plain));
       this.base64Encoded = encoded;
-      this.base64Status = '编码成功';
+      this.base64Status = `[${this.formatTimestamp()}] 编码成功`;
     } catch (err) {
       const error = err as Error;
-      this.base64Status = `编码失败: ${error.message}`;
+      this.base64Status = `[${this.formatTimestamp()}] 编码失败: ${error.message}`;
     }
   }
 
@@ -113,10 +147,10 @@ export struct ToolsPage {
     try {
       const decoded = base64Helper.decodeSync(this.base64Encoded);
       this.base64Plain = textDecoder.decodeToString(decoded);
-      this.base64Status = '解码成功';
+      this.base64Status = `[${this.formatTimestamp()}] 解码成功`;
     } catch (err) {
       const error = err as Error;
-      this.base64Status = `解码失败: ${error.message}`;
+      this.base64Status = `[${this.formatTimestamp()}] 解码失败: ${error.message}`;
     }
   }
 
@@ -140,7 +174,7 @@ export struct ToolsPage {
     }
     const tcpSocket = socket.constructTCPSocketInstance();
     this.portLoading = true;
-    this.portResult = '正在连接...';
+    this.portResult = `[${this.formatTimestamp()}] 正在连接...`;
     try {
       const start = new Date().getTime();
       await tcpSocket.connect({
@@ -152,10 +186,10 @@ export struct ToolsPage {
         timeout: timeout
       });
       const duration = new Date().getTime() - start;
-      this.portResult = `端口开放，响应时间 ${duration} ms`;
+      this.portResult = `[${this.formatTimestamp()}] 端口开放，响应时间 ${duration} ms`;
     } catch (err) {
       const error = err as Error;
-      this.portResult = `端口不可用: ${error.message}`;
+      this.portResult = `[${this.formatTimestamp()}] 端口不可用: ${error.message}`;
     } finally {
       try {
         tcpSocket.close();
@@ -185,16 +219,33 @@ export struct ToolsPage {
   }
 
   @Builder
-  private buildResultBlock(result: string) {
+  private buildResultBlock(label: string, result: string, onClear: () => void) {
     Column({ space: 8 }) {
-      Text('输出')
-        .fontSize(14)
-        .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+      Row({ space: 8 }) {
+        Text('输出')
+          .fontSize(14)
+          .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+        Blank().layoutWeight(1);
+        if (result) {
+          Button('复制')
+            .type(ButtonType.Capsule)
+            .height(28)
+            .fontSize(12)
+            .onClick(() => { this.copyResult(result, label); });
+          Button('清空')
+            .type(ButtonType.Capsule)
+            .height(28)
+            .fontSize(12)
+            .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+            .onClick(() => { onClear(); });
+        }
+      }
       Text(result || '暂无结果')
         .fontSize(14)
         .textAlign(TextAlign.Start)
         .fontFamily('monospace')
-        .maxLines(8);
+        .maxLines(10)
+        .copyOption(CopyOptions.InApp);
     }
     .width('100%');
   }
@@ -217,7 +268,7 @@ export struct ToolsPage {
               .enabled(!this.pingLoading)
               .onClick(() => { this.handlePing(); });
           }
-          this.buildResultBlock(this.pingResult);
+          this.buildResultBlock('Ping', this.pingResult, () => { this.clearPingResult(); });
         });
 
         this.toolCard('Tracert 工具', '查看到目标主机的路由路径', () => {
@@ -235,7 +286,7 @@ export struct ToolsPage {
               .enabled(!this.traceLoading)
               .onClick(() => { this.handleTrace(); });
           }
-          this.buildResultBlock(this.traceResult);
+          this.buildResultBlock('Tracert', this.traceResult, () => { this.clearTraceResult(); });
         });
 
         this.toolCard('Base64 编解码', '在本地完成字符串的编码/解码', () => {
@@ -290,7 +341,7 @@ export struct ToolsPage {
             .height(40)
             .enabled(!this.portLoading)
             .onClick(() => { this.handlePortTest(); });
-          this.buildResultBlock(this.portResult);
+          this.buildResultBlock('端口测试', this.portResult, () => { this.clearPortResult(); });
         });
       }
       .padding(16)

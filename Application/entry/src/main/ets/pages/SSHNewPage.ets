@@ -247,17 +247,18 @@ export struct SSHNewPage {
 
         Row({ space: 12 }) {
           Button(this.isEditMode ? '更新' : '保存')
-            .type(ButtonType.Normal)
+            .type(ButtonType.Capsule)
             .layoutWeight(1)
             .height(48)
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
-            .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+            .backgroundColor($r('app.color.login_button'))
+            .fontColor(Color.White)
             .borderRadius(24)
             .onClick(() => { this.onSave(); })
-          
+
           Button('连接')
-            .type(ButtonType.Normal)
+            .type(ButtonType.Capsule)
             .layoutWeight(1)
             .height(48)
             .fontSize(16)
