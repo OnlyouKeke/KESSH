@@ -1,7 +1,7 @@
-import { promptAction, CopyOptions } from '@kit.ArkUI';
+import { promptAction } from '@kit.ArkUI';
 import { taskpool } from '@kit.ArkTS';
 import util from '@ohos.util';
-import clipboard from '@ohos.miscservices.clipboard';
+import { clipboard } from '@kit.BasicServicesKit';
 import kessh from 'libkessh.so';
 
 const base64Helper: util.Base64Helper = new util.Base64Helper();
@@ -50,8 +50,7 @@ struct ResultBlock {
         .fontSize(14)
         .textAlign(TextAlign.Start)
         .fontFamily('monospace')
-        .maxLines(10)
-        .copyOption(CopyOptions.InApp);
+        .maxLines(10);
     }
     .width('100%');
   }
@@ -96,8 +95,9 @@ export struct ToolsPage {
       return;
     }
     try {
-      const systemClipboard = clipboard.getSystemClipboard();
-      await systemClipboard.setData({ textData: result });
+      const systemClipboard: clipboard.Clipboard = clipboard.getSystemClipboard();
+      const clipData: clipboard.ClipData = { textData: result };
+      await systemClipboard.setData(clipData);
       promptAction.showToast({ message: `${label}结果已复制` });
     } catch (err) {
       const error = err as Error;
@@ -226,7 +226,7 @@ export struct ToolsPage {
   }
 
   @Builder
-  private toolCard(title: string, description: string, content: () => void) {
+  private toolCard(title: string, description: string, @BuilderParam content: () => void) {
     Column({ space: 12 }) {
       Column({ space: 4 }) {
         Text(title)
@@ -236,7 +236,7 @@ export struct ToolsPage {
           .fontSize(14)
           .fontColor($r('sys.color.ohos_id_color_text_secondary'));
       }
-      content();
+      content()
     }
     .padding(16)
     .backgroundColor(Color.White)
