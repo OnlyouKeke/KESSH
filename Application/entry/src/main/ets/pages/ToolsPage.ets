@@ -1,7 +1,7 @@
 import { promptAction } from '@kit.ArkUI';
 import { taskpool } from '@kit.ArkTS';
+import { pasteboard } from '@kit.BasicServicesKit';
 import util from '@ohos.util';
-import { clipboard } from '@kit.BasicServicesKit';
 import kessh from 'libkessh.so';
 
 const base64Helper: util.Base64Helper = new util.Base64Helper();
@@ -95,9 +95,9 @@ export struct ToolsPage {
       return;
     }
     try {
-      const systemClipboard: clipboard.Clipboard = clipboard.getSystemClipboard();
-      const clipData: clipboard.ClipData = { textData: result };
-      await systemClipboard.setData(clipData);
+      const pasteData: pasteboard.PasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, result);
+      const systemPasteboard: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
+      await systemPasteboard.setData(pasteData);
       promptAction.showToast({ message: `${label}结果已复制` });
     } catch (err) {
       const error = err as Error;
@@ -226,7 +226,7 @@ export struct ToolsPage {
   }
 
   @Builder
-  private toolCard(title: string, description: string, @BuilderParam content: () => void) {
+  toolCard(title: string, description: string, @BuilderParam content: () => void) {
     Column({ space: 12 }) {
       Column({ space: 4 }) {
         Text(title)
@@ -248,7 +248,7 @@ export struct ToolsPage {
   build() {
     Scroll() {
       Column({ space: 16 }) {
-        this.toolCard('Ping 工具', '快速检测主机连通性与延迟', () => {
+        this.toolCard('Ping 工具', '快速检测主机连通性与延迟', (): void => {
           TextInput({ placeholder: '主机或IP地址', text: this.pingHost })
             .onChange((value: string): void => { this.pingHost = value; });
           Row({ space: 12 }) {
@@ -261,7 +261,7 @@ export struct ToolsPage {
               .layoutWeight(1)
               .height(40)
               .enabled(!this.pingLoading)
-              .onClick(() => { this.handlePing(); });
+              .onClick((): void => { this.handlePing(); });
           }
           ResultBlock({
             label: 'Ping',
@@ -271,7 +271,7 @@ export struct ToolsPage {
           });
         });
 
-        this.toolCard('Tracert 工具', '查看到目标主机的路由路径', () => {
+        this.toolCard('Tracert 工具', '查看到目标主机的路由路径', (): void => {
           TextInput({ placeholder: '主机或IP地址', text: this.traceHost })
             .onChange((value: string): void => { this.traceHost = value; });
           Row({ space: 12 }) {
@@ -284,7 +284,7 @@ export struct ToolsPage {
               .layoutWeight(1)
               .height(40)
               .enabled(!this.traceLoading)
-              .onClick(() => { this.handleTrace(); });
+              .onClick((): void => { this.handleTrace(); });
           }
           ResultBlock({
             label: 'Tracert',
@@ -294,7 +294,7 @@ export struct ToolsPage {
           });
         });
 
-        this.toolCard('Base64 编解码', '在本地完成字符串的编码/解码', () => {
+        this.toolCard('Base64 编解码', '在本地完成字符串的编码/解码', (): void => {
           Text('原文')
             .fontSize(14)
             .fontColor($r('sys.color.ohos_id_color_text_secondary'));
@@ -316,11 +316,11 @@ export struct ToolsPage {
             Button('编码 →')
               .layoutWeight(1)
               .height(36)
-              .onClick(() => { this.handleBase64Encode(); });
+              .onClick((): void => { this.handleBase64Encode(); });
             Button('← 解码')
               .layoutWeight(1)
               .height(36)
-              .onClick(() => { this.handleBase64Decode(); });
+              .onClick((): void => { this.handleBase64Decode(); });
           }
 
           Text(this.base64Status || '在本地完成转换，不会上传数据')
@@ -328,7 +328,7 @@ export struct ToolsPage {
             .fontColor($r('sys.color.ohos_id_color_text_secondary'));
         });
 
-        this.toolCard('端口测试', '验证指定主机端口是否开放', () => {
+        this.toolCard('端口测试', '验证指定主机端口是否开放', (): void => {
           TextInput({ placeholder: '主机或IP地址', text: this.portHost })
             .onChange((value: string): void => { this.portHost = value; });
           Row({ space: 12 }) {
@@ -345,7 +345,7 @@ export struct ToolsPage {
             .type(ButtonType.Normal)
             .height(40)
             .enabled(!this.portLoading)
-            .onClick(() => { this.handlePortTest(); });
+            .onClick((): void => { this.handlePortTest(); });
           ResultBlock({
             label: '端口测试',
             result: this.portResult,
