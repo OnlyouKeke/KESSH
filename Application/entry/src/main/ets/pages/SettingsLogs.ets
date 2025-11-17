@@ -32,22 +32,20 @@ struct SettingsLogs {
     Column() {
       // 顶部：状态栏占位 + 标题栏（返回）
       Row() {
-        Button({ type: ButtonType.Normal }) {
-          Text('<')
-            .fontSize(20)
-        }
-        .height(32)
-        .width(32)
-        .borderRadius(8)
-        .backgroundColor('transparent')
-        .onClick((): void => {
-          router.back();
-        })
+        Text('<')
+          .fontSize(24)
+          .fontWeight(FontWeight.Medium)
+          .width(40)
+          .height(40)
+          .textAlign(TextAlign.Center)
+          .onClick((): void => {
+            router.back();
+          })
         
         Text('日志')
           .fontSize(20)
           .fontWeight(FontWeight.Medium)
-          .margin({ left: 8 })
+          .margin({ left: 4 })
         Blank().layoutWeight(1)
         Text(`总计 ${Logger.list().length}`)
           .fontSize(14)
@@ -55,7 +53,7 @@ struct SettingsLogs {
       }
       .height(56)
       .width('100%')
-      .padding({ left: 12, right: 16 })
+      .padding({ left: 8, right: 16 })
       
       // 筛选按钮
       Row() {

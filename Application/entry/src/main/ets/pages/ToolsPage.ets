@@ -14,11 +14,6 @@ function runPing(host: string, count: number): string {
 }
 
 @Concurrent
-function runTrace(host: string, maxHops: number): string {
-  return kessh.traceRoute(host, maxHops);
-}
-
-@Concurrent
 function runPortCheck(host: string, port: number, timeout: number): string {
   return kessh.testPort(host, port, timeout);
 }
@@ -30,10 +25,9 @@ export struct ToolsPage {
   @State pingResult: string = '';
   @State pingLoading: boolean = false;
 
-  @State traceHost: string = '';
-  @State traceMaxHop: string = '20';
-  @State traceResult: string = '';
-  @State traceLoading: boolean = false;
+  @State subnetIp: string = '';
+  @State subnetMask: string = '24';
+  @State subnetResult: string = '';
 
   @State base64Plain: string = '';
   @State base64Encoded: string = '';
@@ -71,8 +65,8 @@ export struct ToolsPage {
     this.pingResult = '';
   }
 
-  private clearTraceResult(): void {
-    this.traceResult = '';
+  private clearSubnetResult(): void {
+    this.subnetResult = '';
   }
 
   private clearPortResult(): void {
@@ -110,30 +104,108 @@ export struct ToolsPage {
     }
   }
 
-  private async handleTrace(): Promise<void> {
-    const host = this.normalizeHost(this.traceHost);
-    if (!host) {
-      promptAction.showToast({ message: '请输入需要 Tracert 的主机' });
+  private calculateSubnet(): void {
+    const ip = this.normalizeHost(this.subnetIp);
+    if (!ip) {
+      promptAction.showToast({ message: '请输入IP地址' });
       return;
     }
-    let maxHops = parseInt(this.traceMaxHop) || 20;
-    if (maxHops <= 0) {
-      maxHops = 20;
+    
+    // 验证IP格式
+    const ipParts = ip.split('.');
+    if (ipParts.length !== 4 || !ipParts.every((part) => {
+      const num = parseInt(part);
+      return !isNaN(num) && num >= 0 && num <= 255;
+    })) {
+      promptAction.showToast({ message: 'IP地址格式错误' });
+      return;
     }
-    if (maxHops > 64) {
-      maxHops = 64;
-    }
-    this.traceLoading = true;
-    this.traceResult = `[${this.formatTimestamp()}] 正在探测路径...`;
+    
+    let maskBits = parseInt(this.subnetMask) || 24;
+    if (maskBits < 0) maskBits = 0;
+    if (maskBits > 32) maskBits = 32;
+    
     try {
-      const task = new taskpool.Task(runTrace, host, maxHops);
-      const output = await taskpool.execute(task) as string;
-      this.traceResult = `[${this.formatTimestamp()}]\n${output}`;
+      // 计算子网掩码
+      const mask = (0xFFFFFFFF << (32 - maskBits)) >>> 0;
+      const maskOctets = [
+        (mask >>> 24) & 0xFF,
+        (mask >>> 16) & 0xFF,
+        (mask >>> 8) & 0xFF,
+        mask & 0xFF
+      ];
+      const maskStr = maskOctets.join('.');
+      
+      // 计算网络地址
+      const ipNum = ipParts.reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
+      const networkNum = (ipNum & mask) >>> 0;
+      const networkOctets = [
+        (networkNum >>> 24) & 0xFF,
+        (networkNum >>> 16) & 0xFF,
+        (networkNum >>> 8) & 0xFF,
+        networkNum & 0xFF
+      ];
+      const networkStr = networkOctets.join('.');
+      
+      // 计算广播地址
+      const broadcastNum = (networkNum | (~mask & 0xFFFFFFFF)) >>> 0;
+      const broadcastOctets = [
+        (broadcastNum >>> 24) & 0xFF,
+        (broadcastNum >>> 16) & 0xFF,
+        (broadcastNum >>> 8) & 0xFF,
+        broadcastNum & 0xFF
+      ];
+      const broadcastStr = broadcastOctets.join('.');
+      
+      // 计算主机范围
+      const firstHostNum = networkNum + 1;
+      const lastHostNum = broadcastNum - 1;
+      const firstHostOctets = [
+        (firstHostNum >>> 24) & 0xFF,
+        (firstHostNum >>> 16) & 0xFF,
+        (firstHostNum >>> 8) & 0xFF,
+        firstHostNum & 0xFF
+      ];
+      const lastHostOctets = [
+        (lastHostNum >>> 24) & 0xFF,
+        (lastHostNum >>> 16) & 0xFF,
+        (lastHostNum >>> 8) & 0xFF,
+        lastHostNum & 0xFF
+      ];
+      const firstHostStr = firstHostOctets.join('.');
+      const lastHostStr = lastHostOctets.join('.');
+      
+      // 计算可用主机数
+      const totalHosts = Math.pow(2, 32 - maskBits);
+      const usableHosts = maskBits === 32 ? 1 : (maskBits === 31 ? 2 : totalHosts - 2);
+      
+      // 判断IP类别
+      const firstOctet = parseInt(ipParts[0]);
+      let ipClass = '';
+      if (firstOctet >= 1 && firstOctet <= 126) ipClass = 'A类';
+      else if (firstOctet >= 128 && firstOctet <= 191) ipClass = 'B类';
+      else if (firstOctet >= 192 && firstOctet <= 223) ipClass = 'C类';
+      else if (firstOctet >= 224 && firstOctet <= 239) ipClass = 'D类(组播)';
+      else if (firstOctet >= 240 && firstOctet <= 255) ipClass = 'E类(保留)';
+      
+      // 判断是否为私有地址
+      let isPrivate = false;
+      if (firstOctet === 10) isPrivate = true;
+      else if (firstOctet === 172 && parseInt(ipParts[1]) >= 16 && parseInt(ipParts[1]) <= 31) isPrivate = true;
+      else if (firstOctet === 192 && parseInt(ipParts[1]) === 168) isPrivate = true;
+      
+      this.subnetResult = `IP地址: ${ip}\n` +
+        `子网掩码: ${maskStr} (/${maskBits})\n` +
+        `网络地址: ${networkStr}\n` +
+        `广播地址: ${broadcastStr}\n` +
+        `主机范围: ${firstHostStr} - ${lastHostStr}\n` +
+        `总IP数: ${totalHosts}\n` +
+        `可用主机数: ${usableHosts}\n` +
+        `IP类别: ${ipClass}\n` +
+        `地址类型: ${isPrivate ? '私有地址' : '公网地址'}`;
     } catch (err) {
       const error = err as Error;
-      this.traceResult = `[${this.formatTimestamp()}] Tracert 执行失败: ${error.message}`;
-    } finally {
-      this.traceLoading = false;
+      this.subnetResult = `计算失败: ${error.message}`;
     }
   }
 
@@ -248,55 +320,54 @@ export struct ToolsPage {
   }
 
   @Builder
-  traceToolCard() {
+  subnetCalcCard() {
     Column({ space: 12 }) {
       Column({ space: 4 }) {
-        Text('Tracert 工具')
+        Text('子网掩码计算器')
           .fontSize(20)
           .fontWeight(FontWeight.Medium);
-        Text('查看到目标主机的路由路径')
+        Text('计算IP地址的子网信息')
           .fontSize(14)
           .fontColor($r('sys.color.ohos_id_color_text_secondary'));
       }
-      TextInput({ placeholder: '主机或IP地址', text: this.traceHost })
-        .onChange((value: string): void => { this.traceHost = value; });
+      TextInput({ placeholder: 'IP地址 (例: 192.168.1.1)', text: this.subnetIp })
+        .onChange((value: string): void => { this.subnetIp = value; });
       Row({ space: 12 }) {
-        TextInput({ placeholder: '最大跳数(1-64)', text: this.traceMaxHop })
+        TextInput({ placeholder: '掩码位数(0-32)', text: this.subnetMask })
           .type(InputType.Number)
           .layoutWeight(1)
-          .onChange((value: string): void => { this.traceMaxHop = value; });
-        Button(this.traceLoading ? '探测中...' : '开始 Tracert')
+          .onChange((value: string): void => { this.subnetMask = value; });
+        Button('计算')
           .type(ButtonType.Normal)
           .layoutWeight(1)
           .height(40)
-          .enabled(!this.traceLoading)
-          .onClick((): void => { this.handleTrace(); });
+          .onClick((): void => { this.calculateSubnet(); });
       }
       Column({ space: 8 }) {
         Row({ space: 8 }) {
-          Text('输出')
+          Text('计算结果')
             .fontSize(14)
             .fontColor($r('sys.color.ohos_id_color_text_secondary'));
           Blank().layoutWeight(1);
-          if (this.traceResult) {
+          if (this.subnetResult) {
             Button('复制')
               .type(ButtonType.Capsule)
               .height(28)
               .fontSize(12)
-              .onClick((): void => { void this.copyResult(this.traceResult, 'Tracert'); });
+              .onClick((): void => { void this.copyResult(this.subnetResult, '子网计算'); });
             Button('清空')
               .type(ButtonType.Capsule)
               .height(28)
               .fontSize(12)
               .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
-              .onClick((): void => { this.clearTraceResult(); });
+              .onClick((): void => { this.clearSubnetResult(); });
           }
         }
-        Text(this.traceResult || '暂无结果')
+        Text(this.subnetResult || '暂无结果')
           .fontSize(14)
           .textAlign(TextAlign.Start)
           .fontFamily('monospace')
-          .maxLines(10);
+          .maxLines(15);
       }
       .width('100%');
     }
@@ -424,7 +495,7 @@ export struct ToolsPage {
     Scroll() {
       Column({ space: 16 }) {
         this.pingToolCard();
-        this.traceToolCard();
+        this.subnetCalcCard();
         this.base64ToolCard();
         this.portTestToolCard();
       }

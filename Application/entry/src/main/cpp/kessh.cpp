@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <fcntl.h>
@@ -16,7 +17,8 @@
 #include <cerrno>
 #include <hilog/log.h>
 #include <chrono>
-#include <sys/select.h>
+#include <sstream>
+#include <iomanip>
 
 #undef LOG_DOMAIN
 #undef LOG_TAG
@@ -69,48 +71,6 @@ static bool is_valid_host(const std::string &host)
         }
     }
     return true;
-}
-
-struct CommandCandidate {
-    std::string binary;      // Binary path used for availability checks
-    std::string invocation;  // Actual command string that should be executed
-};
-
-static bool is_command_available(const CommandCandidate &candidate)
-{
-    if (candidate.binary.empty()) {
-        // Cannot verify availability, assume it can be resolved from PATH
-        return true;
-    }
-    return access(candidate.binary.c_str(), X_OK) == 0;
-}
-
-static std::string select_command(const std::vector<CommandCandidate> &candidates, const std::string &args)
-{
-    for (const auto &candidate : candidates) {
-        if (is_command_available(candidate)) {
-            return candidate.invocation + " " + args;
-        }
-    }
-    return "";
-}
-
-static std::string run_shell_command(const std::string &command)
-{
-    std::string output;
-    FILE *pipe = popen(command.c_str(), "r");
-    if (!pipe) {
-        output = "无法执行命令: " + command + "\n";
-        output += "请确认设备支持相关工具";
-        return output;
-    }
-    char buffer[512];
-    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-        output += buffer;
-    }
-    int status = pclose(pipe);
-    output += "\n(退出状态: " + std::to_string(status) + ")";
-    return output;
 }
 
 napi_value OpenSession(napi_env env, napi_callback_info info) {
@@ -814,18 +774,22 @@ napi_value UploadFile(napi_env env, napi_callback_info info) {
     return result;
 }
 
+// ICMP Ping 实现 - 使用 TCP 连接模拟 ping
 napi_value PingHost(napi_env env, napi_callback_info info)
 {
+    log_info("[PING STEP 1] PingHost function called");
     size_t argc = 2;
     napi_value args[2];
     napi_status status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     if (status != napi_ok || argc < 1) {
+        log_error("[PING ERROR] Invalid arguments");
         napi_throw_error(env, nullptr, "PingHost: invalid arguments");
         return nullptr;
     }
 
     std::string host = get_string_arg(env, args[0]);
     if (!is_valid_host(host)) {
+        log_error("[PING ERROR] Invalid host: %s", host.c_str());
         napi_throw_error(env, nullptr, "PingHost: invalid host");
         return nullptr;
     }
@@ -834,108 +798,123 @@ napi_value PingHost(napi_env env, napi_callback_info info)
     if (argc >= 2) {
         napi_get_value_int32(env, args[1], &count);
     }
-    if (count <= 0) {
-        count = 4;
+    if (count <= 0) count = 4;
+    if (count > 10) count = 10;
+
+    log_info("[PING STEP 2] Pinging %s, count: %d", host.c_str(), count);
+
+    std::ostringstream result_stream;
+    result_stream << "PING " << host << "\n";
+
+    // 解析地址
+    struct addrinfo hints = {};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_ADDRCONFIG;
+
+    struct addrinfo *addr_result = nullptr;
+    int addr_status = getaddrinfo(host.c_str(), "80", &hints, &addr_result);
+    if (addr_status != 0) {
+        log_error("[PING ERROR] DNS resolution failed: %s", gai_strerror(addr_status));
+        result_stream << "DNS 解析失败: " << gai_strerror(addr_status) << "\n";
+        std::string output = result_stream.str();
+        napi_value return_value;
+        napi_create_string_utf8(env, output.c_str(), output.length(), &return_value);
+        return return_value;
     }
-    if (count > 10) {
-        count = 10;
+
+    int success = 0;
+    int failed = 0;
+    double total_time = 0.0;
+    double min_time = 999999.0;
+    double max_time = 0.0;
+
+    for (int i = 0; i < count; i++) {
+        log_info("[PING STEP 3.%d] Attempt %d/%d", i, i+1, count);
+        
+        int sock = socket(addr_result->ai_family, SOCK_STREAM, 0);
+        if (sock < 0) {
+            log_error("[PING ERROR %d] Failed to create socket", i);
+            result_stream << "错误: 无法创建 socket\n";
+            failed++;
+            continue;
+        }
+
+        // 设置超时
+        struct timeval timeout;
+        timeout.tv_sec = 2;
+        timeout.tv_usec = 0;
+        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+        auto start = std::chrono::steady_clock::now();
+        int conn_result = connect(sock, addr_result->ai_addr, addr_result->ai_addrlen);
+        auto end = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration<double, std::milli>(end - start).count();
+
+        if (conn_result == 0 || errno == EISCONN) {
+            success++;
+            total_time += duration;
+            if (duration < min_time) min_time = duration;
+            if (duration > max_time) max_time = duration;
+            
+            result_stream << std::fixed << std::setprecision(2)
+                         << "Reply from " << host << ": time=" << duration << "ms\n";
+            log_info("[PING SUCCESS %d] time=%.2fms", i, duration);
+        } else {
+            failed++;
+            result_stream << "Request timeout\n";
+            log_error("[PING FAILED %d] %s", i, strerror(errno));
+        }
+
+        close(sock);
+        
+        if (i < count - 1) {
+            usleep(200000); // 200ms 间隔
+        }
     }
 
-    std::string command_args = "-c " + std::to_string(count) + " " + host + " 2>&1";
-    std::vector<CommandCandidate> candidates = {
-        {"/system/bin/ping", "/system/bin/ping"},
-        {"/system/bin/toybox", "/system/bin/toybox ping"},
-        {"", "toybox ping"},
-        {"", "ping"}
-    };
+    freeaddrinfo(addr_result);
 
-    std::string command = select_command(candidates, command_args);
-    if (command.empty()) {
-        std::string message = "未找到可用的 ping 命令，请确认系统是否包含 ping/toybox";
-        napi_value fallback_value;
-        napi_create_string_utf8(env, message.c_str(), message.length(), &fallback_value);
-        return fallback_value;
+    // 统计信息
+    result_stream << "\n--- " << host << " ping 统计 ---\n";
+    result_stream << count << " 个数据包已发送, " 
+                  << success << " 个已接收, "
+                  << failed << " 个丢失 ("
+                  << std::fixed << std::setprecision(1)
+                  << (failed * 100.0 / count) << "% 丢包率)\n";
+    
+    if (success > 0) {
+        double avg_time = total_time / success;
+        result_stream << "往返时间(ms): 最小 = " << std::setprecision(2) << min_time
+                      << ", 最大 = " << max_time
+                      << ", 平均 = " << avg_time << "\n";
     }
 
-    std::string result = run_shell_command(command);
-
+    std::string output = result_stream.str();
+    log_info("[PING COMPLETE] Success: %d, Failed: %d", success, failed);
+    
     napi_value return_value;
-    napi_create_string_utf8(env, result.c_str(), result.length(), &return_value);
+    napi_create_string_utf8(env, output.c_str(), output.length(), &return_value);
     return return_value;
 }
 
-napi_value TraceRoute(napi_env env, napi_callback_info info)
-{
-    size_t argc = 2;
-    napi_value args[2];
-    napi_status status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    if (status != napi_ok || argc < 1) {
-        napi_throw_error(env, nullptr, "TraceRoute: invalid arguments");
-        return nullptr;
-    }
-
-    std::string host = get_string_arg(env, args[0]);
-    if (!is_valid_host(host)) {
-        napi_throw_error(env, nullptr, "TraceRoute: invalid host");
-        return nullptr;
-    }
-
-    int32_t max_hops = 20;
-    if (argc >= 2) {
-        napi_get_value_int32(env, args[1], &max_hops);
-    }
-    if (max_hops <= 0) {
-        max_hops = 20;
-    }
-    if (max_hops > 64) {
-        max_hops = 64;
-    }
-
-    std::vector<CommandCandidate> traceroute_candidates = {
-        {"/system/bin/traceroute", "/system/bin/traceroute"},
-        {"/system/bin/toybox", "/system/bin/toybox traceroute"},
-        {"", "toybox traceroute"},
-        {"", "traceroute"}
-    };
-    std::vector<CommandCandidate> tracepath_candidates = {
-        {"/system/bin/tracepath", "/system/bin/tracepath"},
-        {"/system/bin/toybox", "/system/bin/toybox tracepath"},
-        {"", "toybox tracepath"},
-        {"", "tracepath"}
-    };
-
-    std::string command_args = host + " 2>&1";
-    std::string command = select_command(traceroute_candidates, "-m " + std::to_string(max_hops) + " " + command_args);
-    if (command.empty()) {
-        command = select_command(tracepath_candidates, command_args);
-    }
-
-    if (command.empty()) {
-        std::string message = "未找到 traceroute/tracepath 命令，请确认系统是否包含对应网络诊断工具";
-        napi_value fallback_value;
-        napi_create_string_utf8(env, message.c_str(), message.length(), &fallback_value);
-        return fallback_value;
-    }
-
-    std::string result = run_shell_command(command);
-
-    napi_value return_value;
-    napi_create_string_utf8(env, result.c_str(), result.length(), &return_value);
-    return return_value;
-}
-
+// 端口测试实现 - 使用阻塞 socket + 超时
 napi_value TestPort(napi_env env, napi_callback_info info)
 {
+    log_info("[PORT STEP 1] TestPort function called");
     size_t argc = 3;
     napi_value args[3];
     napi_status status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
     if (status != napi_ok || argc < 2) {
+        log_error("[PORT ERROR] Invalid arguments");
         napi_throw_error(env, nullptr, "TestPort: invalid arguments");
         return nullptr;
     }
 
     std::string host = get_string_arg(env, args[0]);
     if (!is_valid_host(host)) {
+        log_error("[PORT ERROR] Invalid host: %s", host.c_str());
         napi_throw_error(env, nullptr, "TestPort: invalid host");
         return nullptr;
     }
@@ -943,6 +922,7 @@ napi_value TestPort(napi_env env, napi_callback_info info)
     int32_t port;
     napi_get_value_int32(env, args[1], &port);
     if (port <= 0 || port > 65535) {
+        log_error("[PORT ERROR] Invalid port: %d", port);
         napi_throw_error(env, nullptr, "TestPort: invalid port");
         return nullptr;
     }
@@ -951,22 +931,21 @@ napi_value TestPort(napi_env env, napi_callback_info info)
     if (argc >= 3) {
         napi_get_value_int32(env, args[2], &timeout_ms);
     }
-    if (timeout_ms < 1000) {
-        timeout_ms = 1000;
-    }
-    if (timeout_ms > 15000) {
-        timeout_ms = 15000;
-    }
+    if (timeout_ms < 1000) timeout_ms = 1000;
+    if (timeout_ms > 15000) timeout_ms = 15000;
+
+    log_info("[PORT STEP 2] Testing %s:%d, timeout: %dms", host.c_str(), port, timeout_ms);
 
     struct addrinfo hints = {};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_ADDRCONFIG;
 
-    struct addrinfo *result = nullptr;
+    struct addrinfo *addr_result = nullptr;
     std::string port_string = std::to_string(port);
-    int addr_status = getaddrinfo(host.c_str(), port_string.c_str(), &hints, &result);
+    int addr_status = getaddrinfo(host.c_str(), port_string.c_str(), &hints, &addr_result);
     if (addr_status != 0) {
+        log_error("[PORT ERROR] DNS resolution failed: %s", gai_strerror(addr_status));
         std::string message = std::string("解析地址失败: ") + gai_strerror(addr_status);
         napi_value fallback_value;
         napi_create_string_utf8(env, message.c_str(), message.length(), &fallback_value);
@@ -977,57 +956,44 @@ napi_value TestPort(napi_env env, napi_callback_info info)
     int error_code = 0;
     auto start = std::chrono::steady_clock::now();
 
-    for (struct addrinfo *ai = result; ai != nullptr && !connected; ai = ai->ai_next) {
+    for (struct addrinfo *ai = addr_result; ai != nullptr && !connected; ai = ai->ai_next) {
+        log_info("[PORT STEP 3] Trying address family %d", ai->ai_family);
+        
         int sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (sock < 0) {
             error_code = errno;
+            log_error("[PORT ERROR] Failed to create socket: %s", strerror(errno));
             continue;
         }
 
-        int flags = fcntl(sock, F_GETFL, 0);
-        if (flags >= 0) {
-            fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+        // 设置阻塞模式 + 超时
+        struct timeval timeout;
+        timeout.tv_sec = timeout_ms / 1000;
+        timeout.tv_usec = (timeout_ms % 1000) * 1000;
+        
+        if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
+            log_error("[PORT ERROR] Failed to set send timeout");
+        }
+        if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+            log_error("[PORT ERROR] Failed to set recv timeout");
         }
 
+        log_info("[PORT STEP 4] Connecting...");
         int conn_result = connect(sock, ai->ai_addr, ai->ai_addrlen);
-        if (conn_result == 0) {
+        
+        if (conn_result == 0 || errno == EISCONN) {
             connected = true;
-            close(sock);
-            break;
-        }
-
-        if (conn_result < 0 && errno == EINPROGRESS) {
-            fd_set writefds;
-            FD_ZERO(&writefds);
-            FD_SET(sock, &writefds);
-            struct timeval tv;
-            tv.tv_sec = timeout_ms / 1000;
-            tv.tv_usec = (timeout_ms % 1000) * 1000;
-
-            int sel = select(sock + 1, nullptr, &writefds, nullptr, &tv);
-            if (sel > 0 && FD_ISSET(sock, &writefds)) {
-                int so_error = 0;
-                socklen_t len = sizeof(so_error);
-                getsockopt(sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
-                if (so_error == 0) {
-                    connected = true;
-                } else {
-                    error_code = so_error;
-                }
-            } else if (sel == 0) {
-                error_code = ETIMEDOUT;
-            } else {
-                error_code = errno;
-            }
+            log_info("[PORT SUCCESS] Connected successfully");
         } else {
             error_code = errno;
+            log_error("[PORT FAILED] Connection failed: %s", strerror(errno));
         }
 
         close(sock);
     }
 
-    if (result != nullptr) {
-        freeaddrinfo(result);
+    if (addr_result != nullptr) {
+        freeaddrinfo(addr_result);
     }
 
     auto end = std::chrono::steady_clock::now();
@@ -1036,11 +1002,13 @@ napi_value TestPort(napi_env env, napi_callback_info info)
     std::string message;
     if (connected) {
         message = "端口开放，响应时间 " + std::to_string(duration) + " ms";
+        log_info("[PORT COMPLETE] Port is open, time: %ldms", duration);
     } else {
         if (error_code == 0) {
             error_code = ECONNREFUSED;
         }
         message = std::string("端口不可用: ") + strerror(error_code);
+        log_error("[PORT COMPLETE] Port unavailable: %s", strerror(error_code));
     }
 
     napi_value return_value;
@@ -1068,7 +1036,6 @@ static napi_value Init(napi_env env, napi_value exports)
         { "uploadFile", nullptr, UploadFile, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "testNative", nullptr, TestNative, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "pingHost", nullptr, PingHost, nullptr, nullptr, nullptr, napi_default, nullptr },
-        { "traceRoute", nullptr, TraceRoute, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "testPort", nullptr, TestPort, nullptr, nullptr, nullptr, napi_default, nullptr }
     };
     
