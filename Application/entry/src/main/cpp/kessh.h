@@ -25,5 +25,6 @@ napi_value TestNative(napi_env env, napi_callback_info info);
 // Network utility helpers
 napi_value PingHost(napi_env env, napi_callback_info info);
 napi_value TraceRoute(napi_env env, napi_callback_info info);
+napi_value TestPort(napi_env env, napi_callback_info info);
 
 #endif // KESSH_H

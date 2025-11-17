@@ -11,3 +11,4 @@ export const uploadFile: (sessionId: number, remotePath: string, content: string
 export const testNative: () => number;
 export const pingHost: (host: string, count?: number) => string;
 export const traceRoute: (host: string, maxHops?: number) => string;
+export const testPort: (host: string, port: number, timeout?: number) => string;

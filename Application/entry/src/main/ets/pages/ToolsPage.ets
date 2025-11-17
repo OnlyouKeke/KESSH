@@ -1,6 +1,5 @@
 import { promptAction, CopyOptions } from '@kit.ArkUI';
 import { taskpool } from '@kit.ArkTS';
-import socket from '@ohos.net.socket';
 import util from '@ohos.util';
 import clipboard from '@ohos.miscservices.clipboard';
 import kessh from 'libkessh.so';
@@ -17,6 +16,50 @@ function runPing(host: string, count: number): string {
 @Concurrent
 function runTrace(host: string, maxHops: number): string {
   return kessh.traceRoute(host, maxHops);
+}
+
+@Component
+struct ResultBlock {
+  @Prop label: string = '';
+  @Prop result: string = '';
+  @Prop onClear: () => void = () => {};
+  @Prop onCopy: () => void = () => {};
+
+  build() {
+    Column({ space: 8 }) {
+      Row({ space: 8 }) {
+        Text('输出')
+          .fontSize(14)
+          .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+        Blank().layoutWeight(1);
+        if (this.result) {
+          Button('复制')
+            .type(ButtonType.Capsule)
+            .height(28)
+            .fontSize(12)
+            .onClick(() => { this.onCopy(); });
+          Button('清空')
+            .type(ButtonType.Capsule)
+            .height(28)
+            .fontSize(12)
+            .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+            .onClick(() => { this.onClear(); });
+        }
+      }
+      Text(this.result || '暂无结果')
+        .fontSize(14)
+        .textAlign(TextAlign.Start)
+        .fontFamily('monospace')
+        .maxLines(10)
+        .copyOption(CopyOptions.InApp);
+    }
+    .width('100%');
+  }
+}
+
+@Concurrent
+function runPortCheck(host: string, port: number, timeout: number): string {
+  return kessh.testPort(host, port, timeout);
 }
 
 @Component
@@ -154,10 +197,6 @@ export struct ToolsPage {
     }
   }
 
-  private getAddressFamily(host: string): socket.NetAddressFamily {
-    return host.includes(':') ? socket.NetAddressFamily.IPV6 : socket.NetAddressFamily.IPV4;
-  }
-
   private async handlePortTest(): Promise<void> {
     const host = this.normalizeHost(this.portHost);
     const port = parseInt(this.portNumber);
@@ -172,28 +211,16 @@ export struct ToolsPage {
     if (timeout > 15000) {
       timeout = 15000;
     }
-    const tcpSocket = socket.constructTCPSocketInstance();
     this.portLoading = true;
     this.portResult = `[${this.formatTimestamp()}] 正在连接...`;
     try {
-      const start = new Date().getTime();
-      await tcpSocket.connect({
-        address: {
-          address: host,
-          port: port,
-          family: this.getAddressFamily(host)
-        },
-        timeout: timeout
-      });
-      const duration = new Date().getTime() - start;
-      this.portResult = `[${this.formatTimestamp()}] 端口开放，响应时间 ${duration} ms`;
+      const task = new taskpool.Task(runPortCheck, host, port, timeout);
+      const output = await taskpool.execute(task) as string;
+      this.portResult = `[${this.formatTimestamp()}]\n${output}`;
     } catch (err) {
       const error = err as Error;
       this.portResult = `[${this.formatTimestamp()}] 端口不可用: ${error.message}`;
     } finally {
-      try {
-        tcpSocket.close();
-      } catch (_) {}
       this.portLoading = false;
     }
   }
@@ -218,38 +245,6 @@ export struct ToolsPage {
     .width('100%');
   }
 
-  @Builder
-  private buildResultBlock(label: string, result: string, onClear: () => void) {
-    Column({ space: 8 }) {
-      Row({ space: 8 }) {
-        Text('输出')
-          .fontSize(14)
-          .fontColor($r('sys.color.ohos_id_color_text_secondary'));
-        Blank().layoutWeight(1);
-        if (result) {
-          Button('复制')
-            .type(ButtonType.Capsule)
-            .height(28)
-            .fontSize(12)
-            .onClick(() => { this.copyResult(result, label); });
-          Button('清空')
-            .type(ButtonType.Capsule)
-            .height(28)
-            .fontSize(12)
-            .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
-            .onClick(() => { onClear(); });
-        }
-      }
-      Text(result || '暂无结果')
-        .fontSize(14)
-        .textAlign(TextAlign.Start)
-        .fontFamily('monospace')
-        .maxLines(10)
-        .copyOption(CopyOptions.InApp);
-    }
-    .width('100%');
-  }
-
   build() {
     Scroll() {
       Column({ space: 16 }) {
@@ -268,7 +263,12 @@ export struct ToolsPage {
               .enabled(!this.pingLoading)
               .onClick(() => { this.handlePing(); });
           }
-          this.buildResultBlock('Ping', this.pingResult, () => { this.clearPingResult(); });
+          ResultBlock({
+            label: 'Ping',
+            result: this.pingResult,
+            onClear: () => { this.clearPingResult(); },
+            onCopy: () => { void this.copyResult(this.pingResult, 'Ping'); }
+          });
         });
 
         this.toolCard('Tracert 工具', '查看到目标主机的路由路径', () => {
@@ -286,7 +286,12 @@ export struct ToolsPage {
               .enabled(!this.traceLoading)
               .onClick(() => { this.handleTrace(); });
           }
-          this.buildResultBlock('Tracert', this.traceResult, () => { this.clearTraceResult(); });
+          ResultBlock({
+            label: 'Tracert',
+            result: this.traceResult,
+            onClear: () => { this.clearTraceResult(); },
+            onCopy: () => { void this.copyResult(this.traceResult, 'Tracert'); }
+          });
         });
 
         this.toolCard('Base64 编解码', '在本地完成字符串的编码/解码', () => {
@@ -341,7 +346,12 @@ export struct ToolsPage {
             .height(40)
             .enabled(!this.portLoading)
             .onClick(() => { this.handlePortTest(); });
-          this.buildResultBlock('端口测试', this.portResult, () => { this.clearPortResult(); });
+          ResultBlock({
+            label: '端口测试',
+            result: this.portResult,
+            onClear: () => { this.clearPortResult(); },
+            onCopy: () => { void this.copyResult(this.portResult, '端口测试'); }
+          });
         });
       }
       .padding(16)
