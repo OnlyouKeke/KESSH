@@ -838,7 +838,7 @@ napi_value PingHost(napi_env env, napi_callback_info info)
         count = 10;
     }
 
-    std::string args = "-c " + std::to_string(count) + " " + host + " 2>&1";
+    std::string command_args = "-c " + std::to_string(count) + " " + host + " 2>&1";
     std::vector<CommandCandidate> candidates = {
         {"/system/bin/ping", "/system/bin/ping"},
         {"/system/bin/toybox", "/system/bin/toybox ping"},
@@ -846,7 +846,7 @@ napi_value PingHost(napi_env env, napi_callback_info info)
         {"", "ping"}
     };
 
-    std::string command = select_command(candidates, args);
+    std::string command = select_command(candidates, command_args);
     if (command.empty()) {
         std::string message = "未找到可用的 ping 命令，请确认系统是否包含 ping/toybox";
         napi_value fallback_value;
@@ -901,10 +901,10 @@ napi_value TraceRoute(napi_env env, napi_callback_info info)
         {"", "tracepath"}
     };
 
-    std::string args = host + " 2>&1";
-    std::string command = select_command(traceroute_candidates, "-m " + std::to_string(max_hops) + " " + args);
+    std::string command_args = host + " 2>&1";
+    std::string command = select_command(traceroute_candidates, "-m " + std::to_string(max_hops) + " " + command_args);
     if (command.empty()) {
-        command = select_command(tracepath_candidates, args);
+        command = select_command(tracepath_candidates, command_args);
     }
 
     if (command.empty()) {
