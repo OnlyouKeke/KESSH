@@ -13,7 +13,10 @@
 #include <cstdio>
 #include <cctype>
 #include <vector>
+#include <cerrno>
 #include <hilog/log.h>
+#include <chrono>
+#include <sys/select.h>
 
 #undef LOG_DOMAIN
 #undef LOG_TAG
@@ -921,6 +924,130 @@ napi_value TraceRoute(napi_env env, napi_callback_info info)
     return return_value;
 }
 
+napi_value TestPort(napi_env env, napi_callback_info info)
+{
+    size_t argc = 3;
+    napi_value args[3];
+    napi_status status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    if (status != napi_ok || argc < 2) {
+        napi_throw_error(env, nullptr, "TestPort: invalid arguments");
+        return nullptr;
+    }
+
+    std::string host = get_string_arg(env, args[0]);
+    if (!is_valid_host(host)) {
+        napi_throw_error(env, nullptr, "TestPort: invalid host");
+        return nullptr;
+    }
+
+    int32_t port;
+    napi_get_value_int32(env, args[1], &port);
+    if (port <= 0 || port > 65535) {
+        napi_throw_error(env, nullptr, "TestPort: invalid port");
+        return nullptr;
+    }
+
+    int32_t timeout_ms = 3000;
+    if (argc >= 3) {
+        napi_get_value_int32(env, args[2], &timeout_ms);
+    }
+    if (timeout_ms < 1000) {
+        timeout_ms = 1000;
+    }
+    if (timeout_ms > 15000) {
+        timeout_ms = 15000;
+    }
+
+    struct addrinfo hints = {};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_ADDRCONFIG;
+
+    struct addrinfo *result = nullptr;
+    std::string port_string = std::to_string(port);
+    int addr_status = getaddrinfo(host.c_str(), port_string.c_str(), &hints, &result);
+    if (addr_status != 0) {
+        std::string message = std::string("解析地址失败: ") + gai_strerror(addr_status);
+        napi_value fallback_value;
+        napi_create_string_utf8(env, message.c_str(), message.length(), &fallback_value);
+        return fallback_value;
+    }
+
+    bool connected = false;
+    int error_code = 0;
+    auto start = std::chrono::steady_clock::now();
+
+    for (struct addrinfo *ai = result; ai != nullptr && !connected; ai = ai->ai_next) {
+        int sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (sock < 0) {
+            error_code = errno;
+            continue;
+        }
+
+        int flags = fcntl(sock, F_GETFL, 0);
+        if (flags >= 0) {
+            fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+        }
+
+        int conn_result = connect(sock, ai->ai_addr, ai->ai_addrlen);
+        if (conn_result == 0) {
+            connected = true;
+            close(sock);
+            break;
+        }
+
+        if (conn_result < 0 && errno == EINPROGRESS) {
+            fd_set writefds;
+            FD_ZERO(&writefds);
+            FD_SET(sock, &writefds);
+            struct timeval tv;
+            tv.tv_sec = timeout_ms / 1000;
+            tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+            int sel = select(sock + 1, nullptr, &writefds, nullptr, &tv);
+            if (sel > 0 && FD_ISSET(sock, &writefds)) {
+                int so_error = 0;
+                socklen_t len = sizeof(so_error);
+                getsockopt(sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
+                if (so_error == 0) {
+                    connected = true;
+                } else {
+                    error_code = so_error;
+                }
+            } else if (sel == 0) {
+                error_code = ETIMEDOUT;
+            } else {
+                error_code = errno;
+            }
+        } else {
+            error_code = errno;
+        }
+
+        close(sock);
+    }
+
+    if (result != nullptr) {
+        freeaddrinfo(result);
+    }
+
+    auto end = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::string message;
+    if (connected) {
+        message = "端口开放，响应时间 " + std::to_string(duration) + " ms";
+    } else {
+        if (error_code == 0) {
+            error_code = ECONNREFUSED;
+        }
+        message = std::string("端口不可用: ") + strerror(error_code);
+    }
+
+    napi_value return_value;
+    napi_create_string_utf8(env, message.c_str(), message.length(), &return_value);
+    return return_value;
+}
+
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports)
 {
@@ -941,7 +1068,8 @@ static napi_value Init(napi_env env, napi_value exports)
         { "uploadFile", nullptr, UploadFile, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "testNative", nullptr, TestNative, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "pingHost", nullptr, PingHost, nullptr, nullptr, nullptr, napi_default, nullptr },
-        { "traceRoute", nullptr, TraceRoute, nullptr, nullptr, nullptr, napi_default, nullptr }
+        { "traceRoute", nullptr, TraceRoute, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "testPort", nullptr, TestPort, nullptr, nullptr, nullptr, napi_default, nullptr }
     };
     
     OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[MODULE INIT] Defining properties...");

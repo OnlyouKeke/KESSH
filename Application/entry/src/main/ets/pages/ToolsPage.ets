@@ -1,6 +1,5 @@
 import { promptAction, CopyOptions } from '@kit.ArkUI';
 import { taskpool } from '@kit.ArkTS';
-import socket from '@ohos.net.socket';
 import util from '@ohos.util';
 import clipboard from '@ohos.miscservices.clipboard';
 import kessh from 'libkessh.so';
@@ -56,6 +55,11 @@ struct ResultBlock {
     }
     .width('100%');
   }
+}
+
+@Concurrent
+function runPortCheck(host: string, port: number, timeout: number): string {
+  return kessh.testPort(host, port, timeout);
 }
 
 @Component
@@ -193,10 +197,6 @@ export struct ToolsPage {
     }
   }
 
-  private getAddressFamily(host: string): socket.NetAddressFamily {
-    return host.includes(':') ? socket.NetAddressFamily.IPV6 : socket.NetAddressFamily.IPV4;
-  }
-
   private async handlePortTest(): Promise<void> {
     const host = this.normalizeHost(this.portHost);
     const port = parseInt(this.portNumber);
@@ -211,28 +211,16 @@ export struct ToolsPage {
     if (timeout > 15000) {
       timeout = 15000;
     }
-    const tcpSocket = socket.constructTCPSocketInstance();
     this.portLoading = true;
     this.portResult = `[${this.formatTimestamp()}] 正在连接...`;
     try {
-      const start = new Date().getTime();
-      await tcpSocket.connect({
-        address: {
-          address: host,
-          port: port,
-          family: this.getAddressFamily(host)
-        },
-        timeout: timeout
-      });
-      const duration = new Date().getTime() - start;
-      this.portResult = `[${this.formatTimestamp()}] 端口开放，响应时间 ${duration} ms`;
+      const task = new taskpool.Task(runPortCheck, host, port, timeout);
+      const output = await taskpool.execute(task) as string;
+      this.portResult = `[${this.formatTimestamp()}]\n${output}`;
     } catch (err) {
       const error = err as Error;
       this.portResult = `[${this.formatTimestamp()}] 端口不可用: ${error.message}`;
     } finally {
-      try {
-        tcpSocket.close();
-      } catch (_) {}
       this.portLoading = false;
     }
   }
