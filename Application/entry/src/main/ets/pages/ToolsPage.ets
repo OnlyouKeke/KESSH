@@ -18,44 +18,6 @@ function runTrace(host: string, maxHops: number): string {
   return kessh.traceRoute(host, maxHops);
 }
 
-@Component
-struct ResultBlock {
-  @Prop label: string = '';
-  @Prop result: string = '';
-  @Prop onClear: () => void = () => {};
-  @Prop onCopy: () => void = () => {};
-
-  build() {
-    Column({ space: 8 }) {
-      Row({ space: 8 }) {
-        Text('输出')
-          .fontSize(14)
-          .fontColor($r('sys.color.ohos_id_color_text_secondary'));
-        Blank().layoutWeight(1);
-        if (this.result) {
-          Button('复制')
-            .type(ButtonType.Capsule)
-            .height(28)
-            .fontSize(12)
-            .onClick(() => { this.onCopy(); });
-          Button('清空')
-            .type(ButtonType.Capsule)
-            .height(28)
-            .fontSize(12)
-            .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
-            .onClick(() => { this.onClear(); });
-        }
-      }
-      Text(this.result || '暂无结果')
-        .fontSize(14)
-        .textAlign(TextAlign.Start)
-        .fontFamily('monospace')
-        .maxLines(10);
-    }
-    .width('100%');
-  }
-}
-
 @Concurrent
 function runPortCheck(host: string, port: number, timeout: number): string {
   return kessh.testPort(host, port, timeout);
@@ -226,17 +188,230 @@ export struct ToolsPage {
   }
 
   @Builder
-  toolCard(title: string, description: string, @BuilderParam content: () => void) {
+  pingToolCard() {
     Column({ space: 12 }) {
       Column({ space: 4 }) {
-        Text(title)
+        Text('Ping 工具')
           .fontSize(20)
           .fontWeight(FontWeight.Medium);
-        Text(description)
+        Text('快速检测主机连通性与延迟')
           .fontSize(14)
           .fontColor($r('sys.color.ohos_id_color_text_secondary'));
       }
-      content()
+      TextInput({ placeholder: '主机或IP地址', text: this.pingHost })
+        .onChange((value: string): void => { this.pingHost = value; });
+      Row({ space: 12 }) {
+        TextInput({ placeholder: '次数(1-10)', text: this.pingCount })
+          .type(InputType.Number)
+          .layoutWeight(1)
+          .onChange((value: string): void => { this.pingCount = value; });
+        Button(this.pingLoading ? '测试中...' : '开始 Ping')
+          .type(ButtonType.Normal)
+          .layoutWeight(1)
+          .height(40)
+          .enabled(!this.pingLoading)
+          .onClick((): void => { this.handlePing(); });
+      }
+      Column({ space: 8 }) {
+        Row({ space: 8 }) {
+          Text('输出')
+            .fontSize(14)
+            .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+          Blank().layoutWeight(1);
+          if (this.pingResult) {
+            Button('复制')
+              .type(ButtonType.Capsule)
+              .height(28)
+              .fontSize(12)
+              .onClick((): void => { void this.copyResult(this.pingResult, 'Ping'); });
+            Button('清空')
+              .type(ButtonType.Capsule)
+              .height(28)
+              .fontSize(12)
+              .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+              .onClick((): void => { this.clearPingResult(); });
+          }
+        }
+        Text(this.pingResult || '暂无结果')
+          .fontSize(14)
+          .textAlign(TextAlign.Start)
+          .fontFamily('monospace')
+          .maxLines(10);
+      }
+      .width('100%');
+    }
+    .padding(16)
+    .backgroundColor(Color.White)
+    .borderRadius(16)
+    .shadow({ radius: 12, color: '#1A000000', offsetX: 0, offsetY: 4 })
+    .width('100%');
+  }
+
+  @Builder
+  traceToolCard() {
+    Column({ space: 12 }) {
+      Column({ space: 4 }) {
+        Text('Tracert 工具')
+          .fontSize(20)
+          .fontWeight(FontWeight.Medium);
+        Text('查看到目标主机的路由路径')
+          .fontSize(14)
+          .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+      }
+      TextInput({ placeholder: '主机或IP地址', text: this.traceHost })
+        .onChange((value: string): void => { this.traceHost = value; });
+      Row({ space: 12 }) {
+        TextInput({ placeholder: '最大跳数(1-64)', text: this.traceMaxHop })
+          .type(InputType.Number)
+          .layoutWeight(1)
+          .onChange((value: string): void => { this.traceMaxHop = value; });
+        Button(this.traceLoading ? '探测中...' : '开始 Tracert')
+          .type(ButtonType.Normal)
+          .layoutWeight(1)
+          .height(40)
+          .enabled(!this.traceLoading)
+          .onClick((): void => { this.handleTrace(); });
+      }
+      Column({ space: 8 }) {
+        Row({ space: 8 }) {
+          Text('输出')
+            .fontSize(14)
+            .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+          Blank().layoutWeight(1);
+          if (this.traceResult) {
+            Button('复制')
+              .type(ButtonType.Capsule)
+              .height(28)
+              .fontSize(12)
+              .onClick((): void => { void this.copyResult(this.traceResult, 'Tracert'); });
+            Button('清空')
+              .type(ButtonType.Capsule)
+              .height(28)
+              .fontSize(12)
+              .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+              .onClick((): void => { this.clearTraceResult(); });
+          }
+        }
+        Text(this.traceResult || '暂无结果')
+          .fontSize(14)
+          .textAlign(TextAlign.Start)
+          .fontFamily('monospace')
+          .maxLines(10);
+      }
+      .width('100%');
+    }
+    .padding(16)
+    .backgroundColor(Color.White)
+    .borderRadius(16)
+    .shadow({ radius: 12, color: '#1A000000', offsetX: 0, offsetY: 4 })
+    .width('100%');
+  }
+
+  @Builder
+  base64ToolCard() {
+    Column({ space: 12 }) {
+      Column({ space: 4 }) {
+        Text('Base64 编解码')
+          .fontSize(20)
+          .fontWeight(FontWeight.Medium);
+        Text('在本地完成字符串的编码/解码')
+          .fontSize(14)
+          .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+      }
+      Text('原文')
+        .fontSize(14)
+        .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+      TextArea({ placeholder: '输入待编码文本', text: this.base64Plain })
+        .height(80)
+        .borderRadius(12)
+        .onChange((value: string): void => { this.base64Plain = value; });
+
+      Text('Base64 文本')
+        .fontSize(14)
+        .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+        .margin({ top: 8 });
+      TextArea({ placeholder: '输入待解码文本', text: this.base64Encoded })
+        .height(80)
+        .borderRadius(12)
+        .onChange((value: string): void => { this.base64Encoded = value; });
+
+      Row({ space: 12 }) {
+        Button('编码 →')
+          .layoutWeight(1)
+          .height(36)
+          .onClick((): void => { this.handleBase64Encode(); });
+        Button('← 解码')
+          .layoutWeight(1)
+          .height(36)
+          .onClick((): void => { this.handleBase64Decode(); });
+      }
+
+      Text(this.base64Status || '在本地完成转换，不会上传数据')
+        .fontSize(13)
+        .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+    }
+    .padding(16)
+    .backgroundColor(Color.White)
+    .borderRadius(16)
+    .shadow({ radius: 12, color: '#1A000000', offsetX: 0, offsetY: 4 })
+    .width('100%');
+  }
+
+  @Builder
+  portTestToolCard() {
+    Column({ space: 12 }) {
+      Column({ space: 4 }) {
+        Text('端口测试')
+          .fontSize(20)
+          .fontWeight(FontWeight.Medium);
+        Text('验证指定主机端口是否开放')
+          .fontSize(14)
+          .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+      }
+      TextInput({ placeholder: '主机或IP地址', text: this.portHost })
+        .onChange((value: string): void => { this.portHost = value; });
+      Row({ space: 12 }) {
+        TextInput({ placeholder: '端口', text: this.portNumber })
+          .type(InputType.Number)
+          .layoutWeight(1)
+          .onChange((value: string): void => { this.portNumber = value; });
+        TextInput({ placeholder: '超时(ms)', text: this.portTimeout })
+          .type(InputType.Number)
+          .layoutWeight(1)
+          .onChange((value: string): void => { this.portTimeout = value; });
+      }
+      Button(this.portLoading ? '测试中...' : '开始测试')
+        .type(ButtonType.Normal)
+        .height(40)
+        .enabled(!this.portLoading)
+        .onClick((): void => { this.handlePortTest(); });
+      Column({ space: 8 }) {
+        Row({ space: 8 }) {
+          Text('输出')
+            .fontSize(14)
+            .fontColor($r('sys.color.ohos_id_color_text_secondary'));
+          Blank().layoutWeight(1);
+          if (this.portResult) {
+            Button('复制')
+              .type(ButtonType.Capsule)
+              .height(28)
+              .fontSize(12)
+              .onClick((): void => { void this.copyResult(this.portResult, '端口测试'); });
+            Button('清空')
+              .type(ButtonType.Capsule)
+              .height(28)
+              .fontSize(12)
+              .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+              .onClick((): void => { this.clearPortResult(); });
+          }
+        }
+        Text(this.portResult || '暂无结果')
+          .fontSize(14)
+          .textAlign(TextAlign.Start)
+          .fontFamily('monospace')
+          .maxLines(10);
+      }
+      .width('100%');
     }
     .padding(16)
     .backgroundColor(Color.White)
@@ -248,111 +423,10 @@ export struct ToolsPage {
   build() {
     Scroll() {
       Column({ space: 16 }) {
-        this.toolCard('Ping 工具', '快速检测主机连通性与延迟', (): void => {
-          TextInput({ placeholder: '主机或IP地址', text: this.pingHost })
-            .onChange((value: string): void => { this.pingHost = value; });
-          Row({ space: 12 }) {
-            TextInput({ placeholder: '次数(1-10)', text: this.pingCount })
-              .type(InputType.Number)
-              .layoutWeight(1)
-              .onChange((value: string): void => { this.pingCount = value; });
-            Button(this.pingLoading ? '测试中...' : '开始 Ping')
-              .type(ButtonType.Normal)
-              .layoutWeight(1)
-              .height(40)
-              .enabled(!this.pingLoading)
-              .onClick((): void => { this.handlePing(); });
-          }
-          ResultBlock({
-            label: 'Ping',
-            result: this.pingResult,
-            onClear: () => { this.clearPingResult(); },
-            onCopy: () => { void this.copyResult(this.pingResult, 'Ping'); }
-          });
-        });
-
-        this.toolCard('Tracert 工具', '查看到目标主机的路由路径', (): void => {
-          TextInput({ placeholder: '主机或IP地址', text: this.traceHost })
-            .onChange((value: string): void => { this.traceHost = value; });
-          Row({ space: 12 }) {
-            TextInput({ placeholder: '最大跳数(1-64)', text: this.traceMaxHop })
-              .type(InputType.Number)
-              .layoutWeight(1)
-              .onChange((value: string): void => { this.traceMaxHop = value; });
-            Button(this.traceLoading ? '探测中...' : '开始 Tracert')
-              .type(ButtonType.Normal)
-              .layoutWeight(1)
-              .height(40)
-              .enabled(!this.traceLoading)
-              .onClick((): void => { this.handleTrace(); });
-          }
-          ResultBlock({
-            label: 'Tracert',
-            result: this.traceResult,
-            onClear: () => { this.clearTraceResult(); },
-            onCopy: () => { void this.copyResult(this.traceResult, 'Tracert'); }
-          });
-        });
-
-        this.toolCard('Base64 编解码', '在本地完成字符串的编码/解码', (): void => {
-          Text('原文')
-            .fontSize(14)
-            .fontColor($r('sys.color.ohos_id_color_text_secondary'));
-          TextArea({ placeholder: '输入待编码文本', text: this.base64Plain })
-            .height(80)
-            .borderRadius(12)
-            .onChange((value: string): void => { this.base64Plain = value; });
-
-          Text('Base64 文本')
-            .fontSize(14)
-            .fontColor($r('sys.color.ohos_id_color_text_secondary'))
-            .margin({ top: 8 });
-          TextArea({ placeholder: '输入待解码文本', text: this.base64Encoded })
-            .height(80)
-            .borderRadius(12)
-            .onChange((value: string): void => { this.base64Encoded = value; });
-
-          Row({ space: 12 }) {
-            Button('编码 →')
-              .layoutWeight(1)
-              .height(36)
-              .onClick((): void => { this.handleBase64Encode(); });
-            Button('← 解码')
-              .layoutWeight(1)
-              .height(36)
-              .onClick((): void => { this.handleBase64Decode(); });
-          }
-
-          Text(this.base64Status || '在本地完成转换，不会上传数据')
-            .fontSize(13)
-            .fontColor($r('sys.color.ohos_id_color_text_secondary'));
-        });
-
-        this.toolCard('端口测试', '验证指定主机端口是否开放', (): void => {
-          TextInput({ placeholder: '主机或IP地址', text: this.portHost })
-            .onChange((value: string): void => { this.portHost = value; });
-          Row({ space: 12 }) {
-            TextInput({ placeholder: '端口', text: this.portNumber })
-              .type(InputType.Number)
-              .layoutWeight(1)
-              .onChange((value: string): void => { this.portNumber = value; });
-            TextInput({ placeholder: '超时(ms)', text: this.portTimeout })
-              .type(InputType.Number)
-              .layoutWeight(1)
-              .onChange((value: string): void => { this.portTimeout = value; });
-          }
-          Button(this.portLoading ? '测试中...' : '开始测试')
-            .type(ButtonType.Normal)
-            .height(40)
-            .enabled(!this.portLoading)
-            .onClick((): void => { this.handlePortTest(); });
-          ResultBlock({
-            label: '端口测试',
-            result: this.portResult,
-            onClear: () => { this.clearPortResult(); },
-            onCopy: () => { void this.copyResult(this.portResult, '端口测试'); }
-          });
-        });
+        this.pingToolCard();
+        this.traceToolCard();
+        this.base64ToolCard();
+        this.portTestToolCard();
       }
       .padding(16)
       .width('100%');
