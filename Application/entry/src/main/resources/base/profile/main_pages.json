@@ -4,6 +4,7 @@
     "pages/HistoryPage",
     "pages/SSHNewPage",
     "pages/SettingsPage",
+    "pages/ToolsPage",
     "pages/Terminal",
     "pages/SCPPage",
     "pages/SettingsKeys",
