@@ -270,6 +270,9 @@ export struct ToolsPage {
           .fontSize(14)
           .fontColor($r('sys.color.ohos_id_color_text_secondary'));
       }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+      
       TextInput({ placeholder: '主机或IP地址', text: this.pingHost })
         .onChange((value: string): void => { this.pingHost = value; });
       Row({ space: 12 }) {
@@ -280,17 +283,23 @@ export struct ToolsPage {
         Button(this.pingLoading ? '测试中...' : '开始 Ping')
           .type(ButtonType.Normal)
           .layoutWeight(1)
-          .height(40)
+          .height(48)
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .backgroundColor($r('sys.color.ohos_id_color_emphasize'))
+          .fontColor(Color.White)
+          .borderRadius(24)
           .enabled(!this.pingLoading)
           .onClick((): void => { this.handlePing(); });
       }
-      Column({ space: 8 }) {
-        Row({ space: 8 }) {
-          Text('输出')
-            .fontSize(14)
-            .fontColor($r('sys.color.ohos_id_color_text_secondary'));
-          Blank().layoutWeight(1);
-          if (this.pingResult) {
+      
+      if (this.pingResult) {
+        Column({ space: 8 }) {
+          Row({ space: 8 }) {
+            Text('输出')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium);
+            Blank().layoutWeight(1);
             Button('复制')
               .type(ButtonType.Capsule)
               .height(28)
@@ -303,19 +312,22 @@ export struct ToolsPage {
               .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
               .onClick((): void => { this.clearPingResult(); });
           }
+          Text(this.pingResult)
+            .fontSize(14)
+            .textAlign(TextAlign.Start)
+            .fontFamily('monospace')
+            .maxLines(10)
+            .width('100%');
         }
-        Text(this.pingResult || '暂无结果')
-          .fontSize(14)
-          .textAlign(TextAlign.Start)
-          .fontFamily('monospace')
-          .maxLines(10);
+        .width('100%')
+        .padding(12)
+        .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
+        .borderRadius(12);
       }
-      .width('100%');
     }
     .padding(16)
-    .backgroundColor(Color.White)
+    .backgroundColor($r('sys.color.ohos_id_color_background'))
     .borderRadius(16)
-    .shadow({ radius: 12, color: '#1A000000', offsetX: 0, offsetY: 4 })
     .width('100%');
   }
 
@@ -330,6 +342,9 @@ export struct ToolsPage {
           .fontSize(14)
           .fontColor($r('sys.color.ohos_id_color_text_secondary'));
       }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+      
       TextInput({ placeholder: 'IP地址 (例: 192.168.1.1)', text: this.subnetIp })
         .onChange((value: string): void => { this.subnetIp = value; });
       Row({ space: 12 }) {
@@ -340,16 +355,22 @@ export struct ToolsPage {
         Button('计算')
           .type(ButtonType.Normal)
           .layoutWeight(1)
-          .height(40)
+          .height(48)
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .backgroundColor($r('sys.color.ohos_id_color_emphasize'))
+          .fontColor(Color.White)
+          .borderRadius(24)
           .onClick((): void => { this.calculateSubnet(); });
       }
-      Column({ space: 8 }) {
-        Row({ space: 8 }) {
-          Text('计算结果')
-            .fontSize(14)
-            .fontColor($r('sys.color.ohos_id_color_text_secondary'));
-          Blank().layoutWeight(1);
-          if (this.subnetResult) {
+      
+      if (this.subnetResult) {
+        Column({ space: 8 }) {
+          Row({ space: 8 }) {
+            Text('计算结果')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium);
+            Blank().layoutWeight(1);
             Button('复制')
               .type(ButtonType.Capsule)
               .height(28)
@@ -362,19 +383,22 @@ export struct ToolsPage {
               .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
               .onClick((): void => { this.clearSubnetResult(); });
           }
+          Text(this.subnetResult)
+            .fontSize(14)
+            .textAlign(TextAlign.Start)
+            .fontFamily('monospace')
+            .maxLines(15)
+            .width('100%');
         }
-        Text(this.subnetResult || '暂无结果')
-          .fontSize(14)
-          .textAlign(TextAlign.Start)
-          .fontFamily('monospace')
-          .maxLines(15);
+        .width('100%')
+        .padding(12)
+        .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
+        .borderRadius(12);
       }
-      .width('100%');
     }
     .padding(16)
-    .backgroundColor(Color.White)
+    .backgroundColor($r('sys.color.ohos_id_color_background'))
     .borderRadius(16)
-    .shadow({ radius: 12, color: '#1A000000', offsetX: 0, offsetY: 4 })
     .width('100%');
   }
 
@@ -408,12 +432,24 @@ export struct ToolsPage {
 
       Row({ space: 12 }) {
         Button('编码 →')
+          .type(ButtonType.Normal)
           .layoutWeight(1)
-          .height(36)
+          .height(48)
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .backgroundColor($r('sys.color.ohos_id_color_emphasize'))
+          .fontColor(Color.White)
+          .borderRadius(24)
           .onClick((): void => { this.handleBase64Encode(); });
         Button('← 解码')
+          .type(ButtonType.Normal)
           .layoutWeight(1)
-          .height(36)
+          .height(48)
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+          .backgroundColor($r('sys.color.ohos_id_color_emphasize'))
+          .fontColor(Color.White)
+          .borderRadius(24)
           .onClick((): void => { this.handleBase64Decode(); });
       }
 
@@ -422,9 +458,8 @@ export struct ToolsPage {
         .fontColor($r('sys.color.ohos_id_color_text_secondary'));
     }
     .padding(16)
-    .backgroundColor(Color.White)
+    .backgroundColor($r('sys.color.ohos_id_color_background'))
     .borderRadius(16)
-    .shadow({ radius: 12, color: '#1A000000', offsetX: 0, offsetY: 4 })
     .width('100%');
   }
 
@@ -439,6 +474,9 @@ export struct ToolsPage {
           .fontSize(14)
           .fontColor($r('sys.color.ohos_id_color_text_secondary'));
       }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+      
       TextInput({ placeholder: '主机或IP地址', text: this.portHost })
         .onChange((value: string): void => { this.portHost = value; });
       Row({ space: 12 }) {
@@ -453,16 +491,23 @@ export struct ToolsPage {
       }
       Button(this.portLoading ? '测试中...' : '开始测试')
         .type(ButtonType.Normal)
-        .height(40)
+        .width('100%')
+        .height(48)
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .backgroundColor($r('sys.color.ohos_id_color_emphasize'))
+        .fontColor(Color.White)
+        .borderRadius(24)
         .enabled(!this.portLoading)
         .onClick((): void => { this.handlePortTest(); });
-      Column({ space: 8 }) {
-        Row({ space: 8 }) {
-          Text('输出')
-            .fontSize(14)
-            .fontColor($r('sys.color.ohos_id_color_text_secondary'));
-          Blank().layoutWeight(1);
-          if (this.portResult) {
+      
+      if (this.portResult) {
+        Column({ space: 8 }) {
+          Row({ space: 8 }) {
+            Text('输出')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium);
+            Blank().layoutWeight(1);
             Button('复制')
               .type(ButtonType.Capsule)
               .height(28)
@@ -475,19 +520,22 @@ export struct ToolsPage {
               .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
               .onClick((): void => { this.clearPortResult(); });
           }
+          Text(this.portResult)
+            .fontSize(14)
+            .textAlign(TextAlign.Start)
+            .fontFamily('monospace')
+            .maxLines(10)
+            .width('100%');
         }
-        Text(this.portResult || '暂无结果')
-          .fontSize(14)
-          .textAlign(TextAlign.Start)
-          .fontFamily('monospace')
-          .maxLines(10);
+        .width('100%')
+        .padding(12)
+        .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
+        .borderRadius(12);
       }
-      .width('100%');
     }
     .padding(16)
-    .backgroundColor(Color.White)
+    .backgroundColor($r('sys.color.ohos_id_color_background'))
     .borderRadius(16)
-    .shadow({ radius: 12, color: '#1A000000', offsetX: 0, offsetY: 4 })
     .width('100%');
   }
 
