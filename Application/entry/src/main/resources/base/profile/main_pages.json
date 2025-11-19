@@ -9,6 +9,10 @@
     "pages/UserAgreement",
     "pages/Feedback",
     "pages/WebSocketTestPage",
-    "pages/WebSocketSSHTestPage"
+    "pages/WebSocketSSHTestPage",
+    "pages/tools/PingTool",
+    "pages/tools/SubnetCalc",
+    "pages/tools/Base64Tool",
+    "pages/tools/PortTest"
   ]
 }

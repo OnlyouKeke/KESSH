@@ -1,6 +1,6 @@
 import { ConnectionStore } from '../common/Stores';
 import { SSHEngine } from '../common/SSHEngine';
-import { router } from '@kit.ArkUI';
+import { router, promptAction } from '@kit.ArkUI';
 import { taskpool } from '@kit.ArkTS';
 import hilog from '@ohos.hilog';
 import kessh from 'libkessh.so';
@@ -88,53 +88,99 @@ struct Terminal {
 
   aboutToAppear(): void {
     const d = ConnectionStore.currentDraft;
-    if (d) {
-      this.lines = [
-        `已连接到 ${d.username}@${d.host}:${d.port}`
-      ];
-      const port = parseInt(d.port || '22');
+    if (!d) {
+      promptAction.showToast({ message: '未找到连接信息' });
+      router.replaceUrl({ url: 'pages/Index' });
+      return;
+    }
+
+    this.lines = [
+      `正在连接 ${d.username}@${d.host}:${d.port}...`
+    ];
+    
+    const port = parseInt(d.port || '22');
+    
+    try {
+      // 尝试建立SSH连接
       if (d.privateKey) {
         // FIXME: Private key authentication is not yet supported
-        this.lines.push('密钥认证功能暂未实现');
-        // this.sessionId = SSHEngine.openSession(d.host, port, d.username, d.privateKey, d.publicKey || '', d.passphrase);
+        promptAction.showToast({ message: '密钥认证功能暂未实现' });
+        router.replaceUrl({ url: 'pages/Index' });
+        return;
       } else {
         this.sessionId = SSHEngine.openSession(d.host, port, d.username, d.password || '');
       }
-      // 在后台线程轮询读取输出
-      if (this.sessionId > 0) {
-        // 发送禁用bracketed paste mode的命令
-        setTimeout(async () => {
-          try {
-            const task = new taskpool.Task(writeSSHInput, this.sessionId, 'printf "\\e[?2004l"\n');
-            await taskpool.execute(task);
-          } catch (e) {
-            hilog.warn(LOG_DOMAIN, LOG_TAG, 'Failed to disable bracketed paste mode');
-          }
-        }, 500);
-        
-        const tid = setInterval(async () => {
-          try {
-            const task = new taskpool.Task(readSSHOutput, this.sessionId);
-            const chunk = await taskpool.execute(task) as string;
-            if (chunk && chunk.length > 0) {
-              this.processOutput(chunk);
-              // 滚动到底部
-              setTimeout(() => {
-                this.scroller.scrollEdge(Edge.Bottom);
-              }, 50);
-            }
-          } catch (e) {
-            const errorMsg: string = e instanceof Error ? e.message : String(e);
-            hilog.error(LOG_DOMAIN, LOG_TAG, 'Read task error: %{public}s', errorMsg);
-          }
-        }, 200) as number;
-        this.timerId = tid;
-      } else {
-        this.lines.push('打开终端会话失败');
+      
+      // 检查连接是否成功
+      if (this.sessionId <= 0) {
+        // 连接失败，判断是否为网络问题
+        const errorMsg = this.isNetworkError(d.host) ? '网络故障，无法连接服务器' : 'SSH连接失败';
+        promptAction.showToast({ message: errorMsg });
+        hilog.error(LOG_DOMAIN, LOG_TAG, 'SSH connection failed: sessionId=%{public}d', this.sessionId);
+        router.replaceUrl({ url: 'pages/Index' });
+        return;
       }
-    } else {
-      this.lines = [ '未找到连接信息' ];
+      
+      // 连接成功
+      this.lines = [
+        `已连接到 ${d.username}@${d.host}:${d.port}`
+      ];
+      
+      // 发送禁用bracketed paste mode的命令
+      setTimeout(async () => {
+        try {
+          const task = new taskpool.Task(writeSSHInput, this.sessionId, 'printf "\\e[?2004l"\n');
+          await taskpool.execute(task);
+        } catch (e) {
+          hilog.warn(LOG_DOMAIN, LOG_TAG, 'Failed to disable bracketed paste mode');
+        }
+      }, 500);
+      
+      // 在后台线程轮询读取输出
+      const tid = setInterval(async () => {
+        try {
+          const task = new taskpool.Task(readSSHOutput, this.sessionId);
+          const chunk = await taskpool.execute(task) as string;
+          if (chunk && chunk.length > 0) {
+            this.processOutput(chunk);
+            // 滚动到底部
+            setTimeout(() => {
+              this.scroller.scrollEdge(Edge.Bottom);
+            }, 50);
+          }
+        } catch (e) {
+          const errorMsg: string = e instanceof Error ? e.message : String(e);
+          hilog.error(LOG_DOMAIN, LOG_TAG, 'Read task error: %{public}s', errorMsg);
+        }
+      }, 200) as number;
+      this.timerId = tid;
+      
+    } catch (error) {
+      // 捕获异常，判断错误类型
+      const err = error as Error;
+      const errorMsg = err.message || String(error);
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'SSH connection exception: %{public}s', errorMsg);
+      
+      // 判断是否为网络问题
+      const isNetworkIssue = this.isNetworkError(d.host) || 
+        errorMsg.includes('network') || 
+        errorMsg.includes('网络') ||
+        errorMsg.includes('timeout') ||
+        errorMsg.includes('超时') ||
+        errorMsg.includes('unreachable') ||
+        errorMsg.includes('不可达');
+      
+      const displayMsg = isNetworkIssue ? '网络故障，无法连接服务器' : `SSH连接失败: ${errorMsg}`;
+      promptAction.showToast({ message: displayMsg });
+      router.replaceUrl({ url: 'pages/Index' });
     }
+  }
+
+  // 简单检测网络问题（可以后续优化）
+  private isNetworkError(host: string): boolean {
+    // 这里可以添加更复杂的网络检测逻辑
+    // 目前简单地返回false，依赖sessionId判断
+    return false;
   }
 
   aboutToDisappear(): void {

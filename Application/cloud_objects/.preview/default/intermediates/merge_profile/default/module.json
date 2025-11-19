@@ -1,11 +1,11 @@
 {
 	"app": {
 		"bundleName": "cn.zwjkeke.ssh",
-		"debug": true,
-		"versionCode": 222,
-		"versionName": "1.2.22",
-		"minAPIVersion": 50100018,
-		"targetAPIVersion": 60000020,
+		"debug": false,
+		"versionCode": 229,
+		"versionName": "1.2.29",
+		"minAPIVersion": 50000012,
+		"targetAPIVersion": 50000012,
 		"apiReleaseType": "Release",
 		"targetMinorAPIVersion": 0,
 		"targetPatchAPIVersion": 0,
@@ -13,7 +13,7 @@
 		"compileSdkType": "HarmonyOS",
 		"appEnvironments": [],
 		"bundleType": "app",
-		"buildMode": "debug"
+		"buildMode": "release"
 	},
 	"module": {
 		"name": "cloud_objects",

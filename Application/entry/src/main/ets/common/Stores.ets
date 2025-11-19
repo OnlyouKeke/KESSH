@@ -9,6 +9,7 @@ const APPLOG_TAG = 'AppLogger';
 const PREF_NAME = 'kessh_data';
 const KEY_CONNECTIONS = 'connections';
 const KEY_SEQ = 'connection_seq';
+const KEY_FIRST_LAUNCH = 'first_launch';
 
 export type AuthType = 'password' | 'key';
 export type ConnectionStatus = 'success' | 'failed' | 'timeout' | 'refused' | 'auth_failed';
@@ -135,6 +136,39 @@ export class Logger {
 export class SettingsStore {
   static darkMode: boolean = false;
   static savePassword: boolean = false;
+  private static prefStore: preferences.Preferences | null = null;
+  private static isFirstLaunch: boolean = true;
+
+  static async init(context: Context): Promise<void> {
+    try {
+      SettingsStore.prefStore = await preferences.getPreferences(context, PREF_NAME);
+      
+      // 读取首次启动标记
+      const firstLaunch = await SettingsStore.prefStore.get(KEY_FIRST_LAUNCH, true);
+      SettingsStore.isFirstLaunch = firstLaunch as boolean;
+      
+      Logger.info(`SettingsStore: 初始化完成, 首次启动=${SettingsStore.isFirstLaunch}`);
+    } catch (err) {
+      Logger.error(`SettingsStore: 初始化失败 ${err}`);
+    }
+  }
+
+  static async markNotFirstLaunch(): Promise<void> {
+    if (!SettingsStore.prefStore) return;
+    
+    try {
+      SettingsStore.isFirstLaunch = false;
+      await SettingsStore.prefStore.put(KEY_FIRST_LAUNCH, false);
+      await SettingsStore.prefStore.flush();
+      Logger.info('SettingsStore: 已标记为非首次启动');
+    } catch (err) {
+      Logger.error(`SettingsStore: 保存首次启动标记失败 ${err}`);
+    }
+  }
+
+  static checkIsFirstLaunch(): boolean {
+    return SettingsStore.isFirstLaunch;
+  }
 
   static setDarkMode(v: boolean): void { 
     SettingsStore.darkMode = v; 
