@@ -156,7 +156,9 @@ struct PingTool {
                   .type(ButtonType.Capsule)
                   .height(32)
                   .fontSize(14)
-                  .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+                  .fontWeight(FontWeight.Medium)
+                  .backgroundColor($r('sys.color.ohos_id_color_warning'))
+                  .fontColor(Color.White)
                   .onClick((): void => { this.clearResult(); })
               }
               

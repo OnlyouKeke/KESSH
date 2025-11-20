@@ -1,7 +1,7 @@
 import { promptAction, router } from '@kit.ArkUI';
 import { picker } from '@kit.CoreFileKit';
 import { fileIo } from '@kit.CoreFileKit';
-import { ConnectionRecord, ConnectionStore, Logger } from '../common/Stores';
+import { ConnectionRecord, ConnectionStore, ConnectionDraft, Logger, SettingsStore } from '../common/Stores';
 import { SSHEngine } from '../common/SSHEngine';
 
 interface FileItem {
@@ -54,14 +54,25 @@ export struct SCPPage {
       // 获取保存的密码
       const password = ConnectionStore.getPassword(this.hostRecord);
       if (!password) {
-        promptAction.showToast({ message: '请先保存密码' });
-        router.replaceUrl({ url: 'pages/Index' });
+        // 如果没有保存密码，跳转到添加主机页面输入密码
+        promptAction.showToast({ message: '请输入密码后连接' });
+        const draft: ConnectionDraft = {
+          host: this.hostRecord.host,
+          port: this.hostRecord.port.toString(),
+          username: this.hostRecord.username,
+          password: '',
+          isEditing: true,
+          editingId: this.hostRecord.id
+        };
+        ConnectionStore.currentDraft = draft;
+        router.replaceUrl({ url: 'pages/SSHNewPage' });
         return;
       }
 
       Logger.info(`SCP: 连接到 ${this.hostRecord.host}:${this.hostRecord.port}`);
       
       // 建立SSH连接
+      SSHEngine.configureKeepalive(SettingsStore.sessionKeepaliveInterval, SettingsStore.sessionKeepaliveAttempts);
       this.sessionId = SSHEngine.openSession(
         this.hostRecord.host,
         this.hostRecord.port,
@@ -84,7 +95,10 @@ export struct SCPPage {
       const error = err as Error;
       Logger.error(`SCP连接失败: ${error.message}`);
       promptAction.showToast({ message: `连接失败: ${error.message}` });
-      router.replaceUrl({ url: 'pages/Index' });
+      // 延迟返回避免应用退出
+      setTimeout(() => {
+        router.back();
+      }, 1000);
     }
   }
 

@@ -9,11 +9,14 @@ struct KesshSession {
     LIBSSH2_SESSION *session;
     LIBSSH2_CHANNEL *channel;
     int sock;
+    int keepaliveFailures;
 };
 
 // Session management
 napi_value OpenSession(napi_env env, napi_callback_info info);
 napi_value CloseSession(napi_env env, napi_callback_info info);
+napi_value SetKeepaliveConfig(napi_env env, napi_callback_info info);
+napi_value SendKeepalive(napi_env env, napi_callback_info info);
 
 // I/O operations
 napi_value Write(napi_env env, napi_callback_info info);

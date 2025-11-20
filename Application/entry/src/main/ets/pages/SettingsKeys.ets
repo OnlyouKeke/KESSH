@@ -1,6 +1,9 @@
 import { KeyStore, ImportedKey } from '../common/Stores';
 import { promptAction } from '@kit.ArkUI';
 import { router } from '@kit.ArkUI';
+import { picker } from '@kit.CoreFileKit';
+import { fileIo } from '@kit.CoreFileKit';
+import util from '@ohos.util';
 
 @Entry
 @Component
@@ -9,6 +12,102 @@ struct SettingsKeys {
   @State keyContent: string = '';
   @State keyPublic: string = '';
   @State keyPassphrase: string = '';
+  @State exportPassword: string = '';
+  @State importPassword: string = '';
+  @State isExporting: boolean = false;
+  @State isImporting: boolean = false;
+  @State keyList: Array<ImportedKey> = [];
+
+  private textEncoder: util.TextEncoder = util.TextEncoder.create();
+  private textDecoder: util.TextDecoder = util.TextDecoder.create();
+
+  aboutToAppear(): void {
+    this.syncKeyList();
+  }
+
+  private syncKeyList(): void {
+    this.keyList = [...KeyStore.list()];
+  }
+
+  private async saveManualKey(): Promise<void> {
+    if (!this.keyName || !this.keyContent) {
+      promptAction.showToast({ message: '请填写名称和私钥' });
+      return;
+    }
+    KeyStore.importKey(this.keyName, this.keyContent, this.keyPublic, this.keyPassphrase);
+    this.keyName = '';
+    this.keyContent = '';
+    this.keyPublic = '';
+    this.keyPassphrase = '';
+    this.syncKeyList();
+    promptAction.showToast({ message: '密钥已保存' });
+  }
+
+  private async exportKeys(): Promise<void> {
+    if (this.isExporting) return;
+    if (this.keyList.length === 0) {
+      promptAction.showToast({ message: '暂无密钥可导出' });
+      return;
+    }
+    if (!this.exportPassword) {
+      promptAction.showToast({ message: '请输入导出密码' });
+      return;
+    }
+    this.isExporting = true;
+    try {
+      const backupContent = KeyStore.exportEncrypted(this.exportPassword);
+      const documentPicker = new picker.DocumentViewPicker();
+      const fileName = `kessh_keys_${new Date().getTime()}.json`;
+      const saveResult = await documentPicker.save({ newFileNames: [fileName] });
+      if (saveResult && saveResult.length > 0) {
+        const saveUri = saveResult[0];
+        const file = fileIo.openSync(saveUri, fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.CREATE);
+        const encoded = this.textEncoder.encodeInto(backupContent);
+        fileIo.writeSync(file.fd, encoded.buffer);
+        fileIo.closeSync(file);
+        promptAction.showToast({ message: `已导出到 ${fileName}` });
+      } else {
+        promptAction.showToast({ message: '已取消导出' });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      promptAction.showToast({ message: `导出失败: ${message}` });
+    } finally {
+      this.isExporting = false;
+    }
+  }
+
+  private async importKeys(): Promise<void> {
+    if (this.isImporting) return;
+    if (!this.importPassword) {
+      promptAction.showToast({ message: '请输入导入密码' });
+      return;
+    }
+    this.isImporting = true;
+    try {
+      const documentPicker = new picker.DocumentViewPicker();
+      const result = await documentPicker.select({ maxSelectNumber: 1 });
+      if (!result || result.length === 0) {
+        promptAction.showToast({ message: '已取消导入' });
+        return;
+      }
+      const uri = result[0];
+      const file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
+      const stat = fileIo.statSync(uri);
+      const buffer = new ArrayBuffer(stat.size);
+      fileIo.readSync(file.fd, buffer);
+      fileIo.closeSync(file);
+      const content = this.textDecoder.decodeWithStream(new Uint8Array(buffer), { stream: false });
+      const stats = KeyStore.importEncrypted(content, this.importPassword);
+      this.syncKeyList();
+      promptAction.showToast({ message: `导入完成: 新增${stats.imported}条, 跳过${stats.skipped}条` });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      promptAction.showToast({ message: `导入失败: ${message}` });
+    } finally {
+      this.isImporting = false;
+    }
+  }
 
   build() {
     Column() {
@@ -38,7 +137,7 @@ struct SettingsKeys {
       Scroll() {
         Column({ space: 16 }) {
           Column({ space: 12 }) {
-            Text('导入密钥')
+            Text('手动添加密钥')
               .fontSize(18)
               .fontWeight(FontWeight.Medium)
               .width('100%')
@@ -68,18 +167,63 @@ struct SettingsKeys {
               .fontColor(Color.White)
               .borderRadius(24)
               .margin({ top: 16 })
-              .onClick((): void => {
-                if (!this.keyName || !this.keyContent) { 
-                  promptAction.showToast({ message: '请填写名称和私钥' }); 
-                  return; 
-                }
-                KeyStore.importKey(this.keyName, this.keyContent, this.keyPublic, this.keyPassphrase);
-                this.keyName = ''; 
-                this.keyContent = ''; 
-                this.keyPublic = ''; 
-                this.keyPassphrase = '';
-                promptAction.showToast({ message: '密钥已保存' });
-              })
+              .onClick((): void => { this.saveManualKey(); })
+          }
+          .padding(16)
+          .backgroundColor($r('sys.color.ohos_id_color_background'))
+          .borderRadius(16)
+
+          Column({ space: 12 }) {
+            Text('密钥备份（加密导出）')
+              .fontSize(18)
+              .fontWeight(FontWeight.Medium)
+              .width('100%')
+            Text('使用自定义密码对所有密钥进行AES加密后导出，请务必牢记该密码。')
+              .fontSize(12)
+              .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+            TextInput({ placeholder: '导出密码', text: this.exportPassword })
+              .type(InputType.Password)
+              .onChange((v: string): void => { this.exportPassword = v })
+            Button(this.isExporting ? '导出中...' : '导出密钥')
+              .type(ButtonType.Normal)
+              .width('100%')
+              .height(48)
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+              .fontColor($r('sys.color.ohos_id_color_text_primary'))
+              .borderRadius(24)
+              .enabled(!this.isExporting)
+              .opacity(this.isExporting ? 0.6 : 1)
+              .onClick((): void => { this.exportKeys(); })
+          }
+          .padding(16)
+          .backgroundColor($r('sys.color.ohos_id_color_background'))
+          .borderRadius(16)
+
+          Column({ space: 12 }) {
+            Text('从备份恢复密钥')
+              .fontSize(18)
+              .fontWeight(FontWeight.Medium)
+              .width('100%')
+            Text('选择先前导出的密钥文件并输入当时设置的密码，即可批量导入。')
+              .fontSize(12)
+              .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+            TextInput({ placeholder: '导入密码', text: this.importPassword })
+              .type(InputType.Password)
+              .onChange((v: string): void => { this.importPassword = v })
+            Button(this.isImporting ? '导入中...' : '导入密钥')
+              .type(ButtonType.Normal)
+              .width('100%')
+              .height(48)
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .backgroundColor($r('sys.color.ohos_id_color_emphasize'))
+              .fontColor(Color.White)
+              .borderRadius(24)
+              .enabled(!this.isImporting)
+              .opacity(this.isImporting ? 0.6 : 1)
+              .onClick((): void => { this.importKeys(); })
           }
           .padding(16)
           .backgroundColor($r('sys.color.ohos_id_color_background'))
@@ -92,9 +236,9 @@ struct SettingsKeys {
       .scrollBar(BarState.Off)
 
       // 列表
-      if (KeyStore.list().length > 0) {
+      if (this.keyList.length > 0) {
         List() {
-          ForEach(KeyStore.list(), (k: ImportedKey) => {
+          ForEach(this.keyList, (k: ImportedKey) => {
             ListItem() {
               Row() {
                 Column({ space: 4 }) {
@@ -127,6 +271,7 @@ struct SettingsKeys {
                     }).then((result) => {
                       if (result.index === 1) {
                         KeyStore.remove(k.id);
+                        this.syncKeyList();
                         promptAction.showToast({ message: '已删除' });
                       }
                     });
@@ -151,7 +296,7 @@ struct SettingsKeys {
           Text('暂无密钥')
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
-          Text('请在上方输入框中导入SSH密钥')
+          Text('可通过手动添加或从备份恢复密钥')
             .fontSize(14)
             .fontColor($r('sys.color.ohos_id_color_text_secondary'))
         }

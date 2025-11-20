@@ -2,8 +2,12 @@
   "src": [
     "pages/Index",
     "pages/Terminal",
+    "pages/SSHNewPage",
     "pages/SCPPage",
     "pages/SettingsKeys",
+    "pages/SettingsSession",
+    "pages/SettingsTerminalFont",
+    "pages/Monitor",
     "pages/SettingsLogs",
     "pages/PrivacyPolicy",
     "pages/UserAgreement",

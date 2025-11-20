@@ -5,6 +5,25 @@ const LOG_DOMAIN = 0xD15B;
 const LOG_TAG = 'SSHEngine';
 
 export class SSHEngine {
+  static configureKeepalive(intervalSeconds: number, attempts: number): void {
+    try {
+      kessh.setKeepaliveConfig(intervalSeconds, attempts);
+      hilog.info(LOG_DOMAIN, LOG_TAG, 'Keepalive config updated: %{public}d s, attempts %{public}d', intervalSeconds, attempts);
+    } catch (error) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'Keepalive config failed: %{public}s', String(error));
+    }
+  }
+
+  static sendKeepalive(sessionId: number): boolean {
+    try {
+      const result: boolean = kessh.sendKeepalive(sessionId);
+      return result;
+    } catch (error) {
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'Keepalive send failed: %{public}s', String(error));
+      return false;
+    }
+  }
+
   // 添加测试函数，不依赖libssh2
   static testNative(): number {
     hilog.info(LOG_DOMAIN, LOG_TAG, '[TEST] Calling testNative...');

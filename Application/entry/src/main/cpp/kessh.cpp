@@ -30,6 +30,9 @@ static int next_session_id = 1;
 static std::mutex session_mutex;
 static bool libssh2_initialized = false;
 static std::mutex init_mutex;
+static int keepalive_interval_seconds = 30;
+static int keepalive_max_attempts = 3;
+static std::mutex keepalive_config_mutex;
 
 // Helper function for logging
 void log_info(const char* format, ...) {
@@ -149,7 +152,7 @@ napi_value OpenSession(napi_env env, napi_callback_info info) {
 
     // Set socket timeout for blocking operations
     struct timeval timeout;
-    timeout.tv_sec = 30;  // 30 seconds timeout for connect
+    timeout.tv_sec = 10;  // 10 seconds timeout for connect
     timeout.tv_usec = 0;
     
     log_info("[C++ STEP 8.5] Setting socket send timeout...");
@@ -177,7 +180,7 @@ napi_value OpenSession(napi_env env, napi_callback_info info) {
     }
 
     log_info("[C++ STEP 11] Address parsed successfully");
-    log_info("[C++ STEP 12] Attempting to connect to %s:%d (BLOCKING mode with 30s timeout)...", host.c_str(), port);
+    log_info("[C++ STEP 12] Attempting to connect to %s:%d (BLOCKING mode with 10s timeout)...", host.c_str(), port);
 
     // 阻塞模式连接，socket 已设置超时
     // 重试机制：如果被信号中断（EINTR），则重试
@@ -267,7 +270,7 @@ napi_value OpenSession(napi_env env, napi_callback_info info) {
     log_info("[C++ STEP 27] Setting session timeout...");
 
     // Set timeout
-    libssh2_session_set_timeout(session, 10000); // 10 seconds
+    libssh2_session_set_timeout(session, 5000); // 5 seconds
 
     log_info("[C++ STEP 28] Starting SSH handshake...");
 
@@ -284,6 +287,14 @@ napi_value OpenSession(napi_env env, napi_callback_info info) {
     }
 
     log_info("[C++ STEP 30] SSH handshake successful");
+    int configured_keepalive = 0;
+    {
+        std::lock_guard<std::mutex> keepalive_lock(keepalive_config_mutex);
+        configured_keepalive = keepalive_interval_seconds;
+    }
+    libssh2_keepalive_config(session, 1, configured_keepalive > 0 ? configured_keepalive : 0);
+    log_info("[C++ KEEPALIVE] Configured keepalive interval=%d seconds", configured_keepalive);
+
     log_info("[C++ STEP 31] Authenticating with password...");
 
     // Authenticate
@@ -358,7 +369,7 @@ napi_value OpenSession(napi_env env, napi_callback_info info) {
     log_info("[C++ STEP 43] Creating session object...");
 
     // Create session object
-    KesshSession* kessh_session = new KesshSession{session, channel, sock};
+    KesshSession* kessh_session = new KesshSession{session, channel, sock, 0};
     
     std::lock_guard<std::mutex> lock(session_mutex);
     int session_id = next_session_id++;
@@ -412,6 +423,73 @@ napi_value CloseSession(napi_env env, napi_callback_info info) {
     // Do not call libssh2_exit() here as it's global cleanup
     // Only call it when the entire application is shutting down
     return nullptr;
+}
+
+napi_value SetKeepaliveConfig(napi_env env, napi_callback_info info) {
+    size_t argc = 2;
+    napi_value args[2];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    int32_t interval = keepalive_interval_seconds;
+    int32_t attempts = keepalive_max_attempts;
+
+    if (argc >= 1) {
+        napi_get_value_int32(env, args[0], &interval);
+    }
+    if (argc >= 2) {
+        napi_get_value_int32(env, args[1], &attempts);
+    }
+
+    if (interval < 0) interval = 0;
+    if (attempts < 0) attempts = 0;
+
+    {
+        std::lock_guard<std::mutex> lock(keepalive_config_mutex);
+        keepalive_interval_seconds = interval;
+        keepalive_max_attempts = attempts;
+    }
+
+    log_info("Keepalive config updated: interval=%d attempts=%d", interval, attempts);
+    return nullptr;
+}
+
+napi_value SendKeepalive(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    int32_t session_id = 0;
+    napi_get_value_int32(env, args[0], &session_id);
+
+    bool success = false;
+    {
+        std::lock_guard<std::mutex> lock(session_mutex);
+        auto it = sessions.find(session_id);
+        if (it != sessions.end()) {
+            KesshSession* kessh_session = it->second;
+            if (kessh_session && kessh_session->session) {
+                int seconds_to_next = 0;
+                int rc = libssh2_keepalive_send(kessh_session->session, &seconds_to_next);
+                if (rc == 0) {
+                    kessh_session->keepaliveFailures = 0;
+                    success = true;
+                    log_info("Keepalive success: session=%d next=%d", session_id, seconds_to_next);
+                } else {
+                    kessh_session->keepaliveFailures += 1;
+                    log_error("Keepalive failed: session=%d rc=%d failures=%d", session_id, rc, kessh_session->keepaliveFailures);
+                    if (keepalive_max_attempts > 0 && kessh_session->keepaliveFailures >= keepalive_max_attempts) {
+                        log_error("Keepalive threshold reached for session %d", session_id);
+                    }
+                }
+            }
+        } else {
+            log_error("Session %d not found for keepalive", session_id);
+        }
+    }
+
+    napi_value result;
+    napi_get_boolean(env, success, &result);
+    return result;
 }
 
 napi_value Write(napi_env env, napi_callback_info info) {
@@ -1029,6 +1107,8 @@ static napi_value Init(napi_env env, napi_value exports)
     napi_property_descriptor desc[] = {
         { "openSession", nullptr, OpenSession, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "closeSession", nullptr, CloseSession, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "setKeepaliveConfig", nullptr, SetKeepaliveConfig, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "sendKeepalive", nullptr, SendKeepalive, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "write", nullptr, Write, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "read", nullptr, Read, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "executeCommand", nullptr, ExecuteCommand, nullptr, nullptr, nullptr, napi_default, nullptr },
