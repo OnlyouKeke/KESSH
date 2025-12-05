@@ -5,28 +5,40 @@ interface ConnectionOption {
   title: string;
   description: string;
   icon: string;
-  badge?: string;
+  elevated?: boolean;
 }
 
 const OPTIONS: Array<ConnectionOption> = [
   {
     key: 'local',
-    title: '本地终端',
-    description: '直接在本机启动终端，无需远程连接',
-    icon: '\uD83C\uDF10',
-    badge: '新增',
+    title: 'Local',
+    description: 'Start a local session without remote hosts',
+    icon: '\ud83d\udcbb',
+    elevated: true,
   },
   {
     key: 'add',
-    title: '添加主机',
-    description: '通过 SSH 登录或管理新的远程主机',
-    icon: '\uD83D\uDCE6',
+    title: 'Add host',
+    description: 'Connect with SSH to a remote machine',
+    icon: '\ud83d\udd11',
   },
   {
-    key: 'scp',
-    title: 'SCP 传输',
-    description: '使用 SCP 在设备之间安全传输文件',
-    icon: '\uD83D\uDCE4',
+    key: 'sftp',
+    title: 'Connect via SFTP',
+    description: 'Transfer files securely over SSH',
+    icon: '\ud83d\udce6',
+  },
+  {
+    key: 'discover',
+    title: 'Discover local devices',
+    description: 'Find hosts on your local network',
+    icon: '\ud83e\uddfe',
+  },
+  {
+    key: 'serial',
+    title: 'Start a serial connection',
+    description: 'Plug in and open a serial console',
+    icon: '\ud83d\udcf1',
   },
 ];
 
@@ -34,65 +46,60 @@ const OPTIONS: Array<ConnectionOption> = [
 @Component
 export default struct SSHNewPage {
   private onSelect(option: ConnectionOption): void {
-    const toast = option.key === 'local'
-      ? `${option.title} 功能即将打开`
-      : `${option.title} 功能保持不变`;
-    promptAction.showToast({ message: toast });
+    promptAction.showToast({ message: `${option.title} 即将打开` });
   }
 
   build() {
     Column() {
       Scroll() {
         Column({ space: 16 }) {
-          Text('连接方式')
-            .fontSize(18)
-            .fontWeight(FontWeight.Medium)
-            .margin({ top: 8 })
+          TextInput({ placeholder: "Search or 'ssh user@hostname -p port'" })
+            .height(44)
+            .padding({ left: 16, right: 16 })
+            .backgroundColor('#10E7F0F5')
+            .borderRadius(14)
 
-          TextInput({ placeholder: '搜索或输入 ssh user@主机 -p 端口' })
-            .height(42)
-            .padding({ left: 14, right: 14 })
-            .backgroundColor('#0F000000')
-            .borderRadius(12)
+          Column({ space: 6 }) {
+            Text('Ways to connect')
+              .fontSize(18)
+              .fontWeight(FontWeight.Medium)
+            Text('Connect via SSH, discover devices on your local network, or use a serial cable.')
+              .fontSize(13)
+              .fontColor(Color.Grey)
+          }
 
-          ForEach(OPTIONS, (item: ConnectionOption) => {
-            Column() {
-              Row() {
-                Text(item.icon)
-                  .fontSize(22)
-                Column({ space: 4 }) {
-                  Row() {
+          Column({ space: 12 }) {
+            ForEach(OPTIONS, (item: ConnectionOption) => {
+              Column() {
+                Row() {
+                  Text(item.icon)
+                    .fontSize(20)
+                    .margin({ right: 12 })
+
+                  Column({ space: 4 }) {
                     Text(item.title)
                       .fontSize(16)
                       .fontWeight(FontWeight.Medium)
-                    if (item.badge) {
-                      Text(item.badge)
-                        .fontSize(11)
-                        .fontColor('#FF6B00')
-                        .backgroundColor('#14FF6B00')
-                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                        .borderRadius(10)
-                        .margin({ left: 8 })
-                    }
+                    Text(item.description)
+                      .fontSize(13)
+                      .fontColor(Color.Grey)
                   }
-                  Text(item.description)
-                    .fontSize(13)
-                    .fontColor(Color.Grey)
+
+                  Blank().layoutWeight(1)
+
+                  Text('›')
+                    .fontSize(18)
+                    .fontColor('#7A7A7A')
                 }
-                .margin({ left: 12 })
-                Blank().layoutWeight(1)
-                Text('›')
-                  .fontSize(18)
-                  .fontColor(Color.Grey)
               }
-            }
-            .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-            .backgroundColor('#0A000000')
-            .borderRadius(16)
-            .onClick((): void => { this.onSelect(item); })
-          }, (item: ConnectionOption) => item.key)
+              .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+              .backgroundColor(item.elevated ? '#14B0DBFF' : '#10E7F0F5')
+              .borderRadius(18)
+              .onClick((): void => { this.onSelect(item); })
+            }, (item: ConnectionOption) => item.key)
+          }
         }
-        .padding(16)
+        .padding({ left: 16, right: 16, bottom: 24 })
         .width('100%')
       }
       .scrollBar(BarState.Off)
@@ -101,5 +108,6 @@ export default struct SSHNewPage {
     }
     .width('100%')
     .height('100%')
+    .backgroundColor('#F5F7FA')
   }
 }
