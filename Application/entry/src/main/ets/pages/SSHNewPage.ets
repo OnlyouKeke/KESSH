@@ -1,183 +1,104 @@
-import { promptAction, router } from '@kit.ArkUI';
-import hilog from '@ohos.hilog';
-import { Logger, SettingsStore, ConnectionStore, KeyStore, ImportedKey, AuthType, ConnectionDraft } from '../common/Stores';
-import { SSHEngine } from '../common/NativeSSH';
+import { promptAction } from '@kit.ArkUI';
 
-const LOG_DOMAIN = 0xD15A;
-const LOG_TAG = 'SSHNewPage';
+interface ConnectionOption {
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  badge?: string;
+}
+
+const OPTIONS: Array<ConnectionOption> = [
+  {
+    key: 'local',
+    title: '本地终端',
+    description: '直接在本机启动终端，无需远程连接',
+    icon: '\uD83C\uDF10',
+    badge: '新增',
+  },
+  {
+    key: 'add',
+    title: '添加主机',
+    description: '通过 SSH 登录或管理新的远程主机',
+    icon: '\uD83D\uDCE6',
+  },
+  {
+    key: 'scp',
+    title: 'SCP 传输',
+    description: '使用 SCP 在设备之间安全传输文件',
+    icon: '\uD83D\uDCE4',
+  },
+];
 
 @Entry
 @Component
 export default struct SSHNewPage {
-  @State host: string = '';
-  @State port: string = '22';
-  @State username: string = '';
-  @State password: string = '';
-  @State selectedKeyId: number = -1;
-  @State authType: string = 'password';
-  @State saveToHistory: boolean = true;
-
-  aboutToAppear(): void {
-    const draft = ConnectionStore.currentDraft;
-    if (draft) {
-      this.host = draft.host || '';
-      this.port = draft.port || '22';
-      this.username = draft.username || '';
-      this.password = draft.password || '';
-    }
-  }
-
-  private async onConnect(): Promise<void> {
-    const host = (this.host || '').trim();
-    const username = (this.username || '').trim();
-    const portValue = (this.port || '22').trim();
-
-    if (!host || !username) {
-      Logger.log('UI: missing host or username for connection attempt');
-      hilog.warn(LOG_DOMAIN, LOG_TAG, 'missing host or username');
-      promptAction.showToast({ message: '请填写主机与用户信息' });
-      return;
-    }
-
-    const auth: AuthType = this.authType === 'key' ? 'key' : 'password';
-    let keyContent: string | undefined = undefined;
-    let keyPublic: string | undefined = undefined;
-    let keyPassphrase: string | undefined = undefined;
-    if (auth === 'key') {
-      const k: ImportedKey | null = KeyStore.getById(this.selectedKeyId);
-      if (!k) {
-        Logger.log('UI: no key selected for key-based authentication');
-        hilog.warn(LOG_DOMAIN, LOG_TAG, 'no key selected for key auth');
-        promptAction.showToast({ message: '请选择已导入的密钥' });
-        return;
-      }
-      keyContent = k.content;
-      keyPublic = k.publicKey;
-      keyPassphrase = k.passphrase;
-    }
-
-    const draft: ConnectionDraft = {
-      host,
-      port: portValue,
-      username,
-      password: auth === 'password' && SettingsStore.savePassword ? this.password : undefined,
-      privateKey: keyContent,
-      publicKey: keyPublic,
-      passphrase: keyPassphrase,
-    };
-    if (this.saveToHistory) {
-      ConnectionStore.addFromDraft(draft, auth);
-    }
-    ConnectionStore.currentDraft = draft;
-
-    Logger.log(`UI: attempt ${auth} connection ${username}@${host}:${portValue}`);
-    hilog.info(LOG_DOMAIN, LOG_TAG, 'attempt connection %{public}s@%{public}s:%{public}s via %{public}s', username, host, portValue, auth);
-
-    const parsedPort = parseInt(portValue || '22');
-    const ok = auth === 'password'
-      ? await SSHEngine.connectPassword(host, parsedPort, username, this.password)
-      : await SSHEngine.connectKey2(host, parsedPort, username, keyContent as string, keyPublic || '', keyPassphrase);
-
-    Logger.log(`UI: connection result ${username}@${host}:${portValue} => ${ok ? 'success' : 'failure'}`);
-    hilog.info(LOG_DOMAIN, LOG_TAG, 'connection result %{public}s@%{public}s:%{public}s => %{public}s', username, host, portValue, ok ? 'success' : 'failure');
-
-    promptAction.showToast({ message: ok ? '连接成功' : '连接失败' });
-    if (ok) {
-      router.pushUrl({ url: 'pages/Terminal' });
-    }
+  private onSelect(option: ConnectionOption): void {
+    const toast = option.key === 'local'
+      ? `${option.title} 功能即将打开`
+      : `${option.title} 功能保持不变`;
+    promptAction.showToast({ message: toast });
   }
 
   build() {
-    Scroll() {
-      Column({ space: 12 }) {
-        Text('连接信息')
-          .fontSize(18)
-          .fontWeight(FontWeight.Medium)
-          .margin({ top: 8, bottom: 4 })
-
-        // 认证方式切换（单选）
-        Row() {
-          Row() {
-            Radio({ value: 'password', group: 'auth' })
-              .checked(this.authType === 'password')
-              .onChange((checked: boolean): void => { if (checked) { this.authType = 'password' } })
-            Text('密码登录').margin({ left: 6 })
-          }
-          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-          .backgroundColor('#0F000000')
-          .borderRadius(12)
-          Blank().width(12)
-          Row() {
-            Radio({ value: 'key', group: 'auth' })
-              .checked(this.authType === 'key')
-              .onChange((checked: boolean): void => { if (checked) { this.authType = 'key' } })
-            Text('密钥登录').margin({ left: 6 })
-          }
-          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-          .backgroundColor('#0F000000')
-          .borderRadius(12)
-        }
-
-        TextInput({ placeholder: '主机/IP', text: this.host })
-          .onChange((v: string): void => { this.host = v })
-
-        TextInput({ placeholder: '端口(默认22)', text: this.port })
-          .type(InputType.Number)
-          .onChange((v: string): void => { this.port = v })
-
-        TextInput({ placeholder: '用户名', text: this.username })
-          .onChange((v: string): void => { this.username = v })
-
-        if (this.authType === 'password') {
-          TextInput({ placeholder: '密码', text: this.password })
-            .type(InputType.Password)
-            .onChange((v: string): void => { this.password = v })
-        } else {
-          Text('选择密钥')
-            .fontSize(16)
+    Column() {
+      Scroll() {
+        Column({ space: 16 }) {
+          Text('连接方式')
+            .fontSize(18)
             .fontWeight(FontWeight.Medium)
             .margin({ top: 8 })
-          if (KeyStore.list().length === 0) {
-            Text('暂无已导入的密钥，请前往设置导入')
-              .fontSize(12)
-              .fontColor(Color.Grey)
-          } else {
-            Column({ space: 8 }) {
-              ForEach(KeyStore.list(), (k: ImportedKey) => {
-                Row() {
-                  Radio({ value: k.id.toString(), group: 'keys' })
-                    .checked(this.selectedKeyId === k.id)
-                    .onChange((checked: boolean): void => { if (checked) { this.selectedKeyId = k.id } })
-                  Text(k.name).margin({ left: 6 })
+
+          TextInput({ placeholder: '搜索或输入 ssh user@主机 -p 端口' })
+            .height(42)
+            .padding({ left: 14, right: 14 })
+            .backgroundColor('#0F000000')
+            .borderRadius(12)
+
+          ForEach(OPTIONS, (item: ConnectionOption) => {
+            Column() {
+              Row() {
+                Text(item.icon)
+                  .fontSize(22)
+                Column({ space: 4 }) {
+                  Row() {
+                    Text(item.title)
+                      .fontSize(16)
+                      .fontWeight(FontWeight.Medium)
+                    if (item.badge) {
+                      Text(item.badge)
+                        .fontSize(11)
+                        .fontColor('#FF6B00')
+                        .backgroundColor('#14FF6B00')
+                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                        .borderRadius(10)
+                        .margin({ left: 8 })
+                    }
+                  }
+                  Text(item.description)
+                    .fontSize(13)
+                    .fontColor(Color.Grey)
                 }
-                .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-                .backgroundColor(this.selectedKeyId === k.id ? '#17000000' : '#0A000000')
-                .borderRadius(10)
-              }, (k: ImportedKey) => k.id.toString())
+                .margin({ left: 12 })
+                Blank().layoutWeight(1)
+                Text('›')
+                  .fontSize(18)
+                  .fontColor(Color.Grey)
+              }
             }
-          }
+            .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+            .backgroundColor('#0A000000')
+            .borderRadius(16)
+            .onClick((): void => { this.onSelect(item); })
+          }, (item: ConnectionOption) => item.key)
         }
-
-        Row() {
-          Text('保存到历史')
-          Blank().layoutWeight(1)
-          Toggle({ type: ToggleType.Switch, isOn: this.saveToHistory })
-            .onChange((v: boolean): void => { this.saveToHistory = v })
-        }
-
-        Button('连接')
-          .type(ButtonType.Normal)
-          .height(44)
-          .backgroundColor('#222222')
-          .fontColor(Color.White)
-          .borderRadius(12)
-          .onClick(() => { this.onConnect(); })
-          .margin({ top: 8 })
+        .padding(16)
+        .width('100%')
       }
-      .padding(16)
+      .scrollBar(BarState.Off)
       .width('100%')
+      .height('100%')
     }
-    .scrollBar(BarState.Off)
     .width('100%')
     .height('100%')
   }
