@@ -355,50 +355,119 @@ struct Terminal {
       // 顶部标题栏（返回 + 快捷键列表）
       Stack() {
         Row() {
-          Text('<')
-            .fontSize(24)
-            .fontWeight(FontWeight.Medium)
-            .width(40)
-            .height(40)
-            .textAlign(TextAlign.Center)
-            .onClick((): void => {
-              router.replaceUrl({ url: 'pages/Index' });
-            })
+          // 返回按钮
+          Button() {
+            Text('<')
+              .fontSize(20)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('sys.color.ohos_id_color_text_primary'))
+          }
+          .type(ButtonType.Normal)
+          .width(40)
+          .height(40)
+          .borderRadius(20)
+          .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+          .onClick((): void => {
+            router.replaceUrl({ url: 'pages/Index' });
+          })
           
           Text('终端')
             .fontSize(20)
             .fontWeight(FontWeight.Medium)
-            .margin({ left: 4 })
+            .margin({ left: 8 })
+          
           Blank().layoutWeight(1)
+          
+          // 常用按键按钮
           Button('常用按键')
             .type(ButtonType.Normal)
-            .height(32)
+            .height(36)
             .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .backgroundColor(this.showKeyMenu ? 
+              $r('sys.color.ohos_id_color_emphasize') : 
+              $r('sys.color.ohos_id_color_button_normal'))
+            .fontColor(this.showKeyMenu ? 
+              Color.White : 
+              $r('sys.color.ohos_id_color_text_primary'))
+            .borderRadius(18)
             .onClick((): void => { this.showKeyMenu = !this.showKeyMenu; })
         }
         .height(56)
         .width('100%')
-        .padding({ left: 8, right: 16 })
+        .padding({ left: 12, right: 16 })
 
         if (this.showKeyMenu) {
-          Column({ space: 8 }) {
-            ForEach(this.quickKeys, (item: QuickKey) => {
-              Button(item.label)
+          Column({ space: 12 }) {
+            // 快捷键按钮组
+            Column({ space: 8 }) {
+              Text('控制按键')
+                .fontSize(12)
+                .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+                .width('100%')
+              
+              ForEach(this.quickKeys, (item: QuickKey) => {
+                Button(item.label)
+                  .type(ButtonType.Normal)
+                  .width('100%')
+                  .height(40)
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .backgroundColor($r('sys.color.ohos_id_color_emphasize'))
+                  .fontColor(Color.White)
+                  .borderRadius(20)
+                  .onClick((): void => { this.sendQuickKey(item.label, item.sequence); });
+              }, (item: QuickKey) => item.label)
+            }
+            .width('100%')
+            
+            // 分割线
+            Divider()
+              .color($r('sys.color.ohos_id_color_list_separator'))
+            
+            // 功能按钮组
+            Column({ space: 8 }) {
+              Text('其他功能')
+                .fontSize(12)
+                .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+                .width('100%')
+              
+              Button('复制输出')
                 .type(ButtonType.Normal)
-                .onClick((): void => { this.sendQuickKey(item.label, item.sequence); });
-            }, (item: QuickKey) => item.label)
-            Button('复制输出')
-              .type(ButtonType.Normal)
-              .onClick((): void => { this.copyOutput(); })
-            Button('粘贴到输入')
-              .type(ButtonType.Normal)
-              .onClick((): void => { this.pasteToInput(); })
+                .width('100%')
+                .height(40)
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+                .fontColor($r('sys.color.ohos_id_color_text_primary'))
+                .borderRadius(20)
+                .onClick((): void => { this.copyOutput(); })
+              
+              Button('粘贴到输入')
+                .type(ButtonType.Normal)
+                .width('100%')
+                .height(40)
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .backgroundColor($r('sys.color.ohos_id_color_button_normal'))
+                .fontColor($r('sys.color.ohos_id_color_text_primary'))
+                .borderRadius(20)
+                .onClick((): void => { this.pasteToInput(); })
+            }
+            .width('100%')
           }
-          .padding(12)
-          .backgroundColor($r('sys.color.ohos_id_color_background'))
-          .borderRadius(12)
-          .shadow({ radius: 6, color: '#33000000', offsetX: 0, offsetY: 2 })
-          .position({ x: '70%', y: 56 })
+          .padding(16)
+          .width(200)
+          .backgroundColor($r('sys.color.ohos_id_color_dialog_bg'))
+          .borderRadius(16)
+          .shadow({ 
+            radius: 24, 
+            color: 'rgba(0, 0, 0, 0.15)', 
+            offsetX: 0, 
+            offsetY: 4 
+          })
+          .position({ x: '100%', y: 56 })
+          .translate({ x: -216 })
         }
       }
 
@@ -430,7 +499,9 @@ struct Terminal {
           .layoutWeight(1)
           .height(48)
           .borderRadius(24)
+          .backgroundColor($r('sys.color.ohos_id_color_text_field_bg'))
         
+        // 执行按钮
         Button() {
           Row({ space: 6 }) {
             Text('执行')
@@ -441,11 +512,13 @@ struct Terminal {
         }
         .type(ButtonType.Normal)
         .height(48)
-        .padding({ left: 20, right: 20 })
-        .backgroundColor($r('sys.color.ohos_id_color_emphasize'))
+        .padding({ left: 24, right: 24 })
+        .backgroundColor(this.cmd.length > 0 ? 
+          $r('sys.color.ohos_id_color_emphasize') : 
+          $r('sys.color.ohos_id_color_button_normal'))
         .borderRadius(24)
         .enabled(this.cmd.length > 0)
-        .opacity(this.cmd.length > 0 ? 1 : 0.5)
+        .stateEffect(this.cmd.length > 0)
         .onClick((): void => { this.run(); })
       }
       .padding({ left: 16, right: 16, top: 12, bottom: 16 })
