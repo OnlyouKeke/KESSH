@@ -2,7 +2,7 @@ import HistoryPage from './HistoryPage';
 import SSHNewPage from './SSHNewPage';
 import SettingsPage from './SettingsPage';
 import TitleBar from '../components/TitleBar';
-import { SSHEngine } from '../common/NativeSSH';
+import { SSHEngine } from '../common/NativeSSH.ets';
 import { LynxBlank, LynxColumn, LynxTabs } from '../common/LynxUI';
 
 let startupProbeDone: boolean = false;
@@ -33,11 +33,11 @@ struct Index {
         barPosition: BarPosition.End,
         barMode: BarMode.Fixed,
         style: { layoutWeight: 1, width: '100%' },
-        onChange: (idx: number) => { this.currentIndex = idx; },
+        onChange: (idx: number): void => { this.currentIndex = idx; },
         items: [
-          { title: 'Vaults', builder: () => HistoryPage({ currentIndex: this.currentIndex }) },
-          { title: 'Connections', builder: () => SSHNewPage() },
-          { title: 'Settings', builder: () => SettingsPage() },
+          { title: 'Vaults', builder: (): void => HistoryPage() },
+          { title: 'Connections', builder: (): void => SSHNewPage() },
+          { title: 'Settings', builder: (): void => SettingsPage() },
         ]
       })
     }

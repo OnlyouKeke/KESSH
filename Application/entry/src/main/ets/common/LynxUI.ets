@@ -7,7 +7,7 @@ export interface LynxStyle {
   borderRadius?: number | string;
   layoutWeight?: number;
   justifyContent?: FlexAlign;
-  alignItems?: HorizontalAlign;
+  alignItems?: ItemAlign;
   opacity?: number;
   borderColor?: ResourceColor;
   borderWidth?: number;
@@ -19,41 +19,46 @@ export interface LynxContainerProps {
   onClick?: () => void;
 }
 
-function applyStyle(component: CommonMethod<any>, style?: LynxStyle): CommonMethod<any> {
-  if (!style) {
-    return component;
-  }
-  if (style.width !== undefined) { component.width(style.width); }
-  if (style.height !== undefined) { component.height(style.height); }
-  if (style.padding !== undefined) { component.padding(style.padding as Padding); }
-  if (style.margin !== undefined) { component.margin(style.margin as Margin); }
-  if (style.backgroundColor !== undefined) { component.backgroundColor(style.backgroundColor); }
-  if (style.borderRadius !== undefined) { component.borderRadius(style.borderRadius as any); }
-  if (style.layoutWeight !== undefined) { component.layoutWeight(style.layoutWeight); }
-  if (style.justifyContent !== undefined) { (component as FlexAlignStyle).justifyContent(style.justifyContent); }
-  if (style.alignItems !== undefined) { (component as FlexAlignStyle).alignItems(style.alignItems); }
-  if (style.opacity !== undefined) { component.opacity(style.opacity); }
-  if (style.borderColor !== undefined) { component.borderColor(style.borderColor); }
-  if (style.borderWidth !== undefined) { component.borderWidth(style.borderWidth); }
-  return component;
-}
-
 @Builder
 export function LynxColumn(props: LynxContainerProps = {}, content?: () => void) {
-  const component = Column({ space: props.space ?? 0 }) {
+  const style = props.style;
+  Column({ space: props.space ?? 0 }) {
     content && content();
-  };
-  applyStyle(component, props.style);
-  if (props.onClick) { component.onClick(props.onClick); }
+  }
+  .width(style?.width)
+  .height(style?.height)
+  .padding(style?.padding as Padding)
+  .margin(style?.margin as Margin)
+  .backgroundColor(style?.backgroundColor)
+  .borderRadius(style?.borderRadius as number)
+  .layoutWeight(style?.layoutWeight)
+  .justifyContent(style?.justifyContent)
+  .alignItems(style?.alignItems)
+  .opacity(style?.opacity)
+  .borderColor(style?.borderColor)
+  .borderWidth(style?.borderWidth)
+  .onClick(props.onClick ?? undefined);
 }
 
 @Builder
 export function LynxRow(props: LynxContainerProps = {}, content?: () => void) {
-  const component = Row({ space: props.space ?? 0 }) {
+  const style = props.style;
+  Row({ space: props.space ?? 0 }) {
     content && content();
-  };
-  applyStyle(component, props.style);
-  if (props.onClick) { component.onClick(props.onClick); }
+  }
+  .width(style?.width)
+  .height(style?.height)
+  .padding(style?.padding as Padding)
+  .margin(style?.margin as Margin)
+  .backgroundColor(style?.backgroundColor)
+  .borderRadius(style?.borderRadius as number)
+  .layoutWeight(style?.layoutWeight)
+  .justifyContent(style?.justifyContent)
+  .alignItems(style?.alignItems)
+  .opacity(style?.opacity)
+  .borderColor(style?.borderColor)
+  .borderWidth(style?.borderWidth)
+  .onClick(props.onClick ?? undefined);
 }
 
 export interface LynxScrollProps extends LynxContainerProps {
@@ -62,11 +67,24 @@ export interface LynxScrollProps extends LynxContainerProps {
 
 @Builder
 export function LynxScroll(props: LynxScrollProps = {}, content?: () => void) {
-  const component = Scroll() {
+  const style = props.style;
+  Scroll() {
     content && content();
-  };
-  component.scrollBar(props.scrollBar ?? BarState.Off);
-  applyStyle(component, props.style);
+  }
+  .scrollBar(props.scrollBar ?? BarState.Off)
+  .width(style?.width)
+  .height(style?.height)
+  .padding(style?.padding as Padding)
+  .margin(style?.margin as Margin)
+  .backgroundColor(style?.backgroundColor)
+  .borderRadius(style?.borderRadius as number)
+  .layoutWeight(style?.layoutWeight)
+  .justifyContent(style?.justifyContent)
+  .alignItems(style?.alignItems)
+  .opacity(style?.opacity)
+  .borderColor(style?.borderColor)
+  .borderWidth(style?.borderWidth)
+  .onClick(props.onClick ?? undefined);
 }
 
 export interface LynxTextStyle extends LynxStyle {
@@ -85,14 +103,26 @@ export interface LynxTextProps {
 
 @Builder
 export function LynxText(props: LynxTextProps) {
-  const component = Text(props.content);
-  if (props.style?.fontSize !== undefined) { component.fontSize(props.style.fontSize as any); }
-  if (props.style?.fontWeight !== undefined) { component.fontWeight(props.style.fontWeight); }
-  if (props.style?.fontColor !== undefined) { component.fontColor(props.style.fontColor); }
-  if (props.style?.textAlign !== undefined) { component.textAlign(props.style.textAlign); }
-  if (props.style?.maxLines !== undefined) { component.maxLines(props.style.maxLines); }
-  if (props.style?.textOverflow !== undefined) { component.textOverflow(props.style.textOverflow); }
-  applyStyle(component, props.style);
+  const style = props.style;
+  Text(props.content)
+    .fontSize(style?.fontSize)
+    .fontWeight(style?.fontWeight)
+    .fontColor(style?.fontColor)
+    .textAlign(style?.textAlign)
+    .maxLines(style?.maxLines)
+    .textOverflow(style?.textOverflow)
+    .width(style?.width)
+    .height(style?.height)
+    .padding(style?.padding as Padding)
+    .margin(style?.margin as Margin)
+    .backgroundColor(style?.backgroundColor)
+    .borderRadius(style?.borderRadius as number)
+    .layoutWeight(style?.layoutWeight)
+    .justifyContent(style?.justifyContent)
+    .alignItems(style?.alignItems)
+    .opacity(style?.opacity)
+    .borderColor(style?.borderColor)
+    .borderWidth(style?.borderWidth);
 }
 
 export interface LynxButtonStyle extends LynxStyle {
@@ -109,19 +139,44 @@ export interface LynxButtonProps {
 
 @Builder
 export function LynxButton(props: LynxButtonProps) {
-  const component = Button(props.label, { type: props.style?.type ?? ButtonType.Normal });
-  if (props.style?.fontColor !== undefined) { component.fontColor(props.style.fontColor); }
-  if (props.style?.textSize !== undefined) { component.fontSize(props.style.textSize as any); }
-  applyStyle(component, props.style);
-  if (props.onClick) { component.onClick(props.onClick); }
+  const style = props.style;
+  Button(props.label, { type: style?.type ?? ButtonType.Normal })
+    .fontColor(style?.fontColor)
+    .fontSize(style?.textSize)
+    .width(style?.width)
+    .height(style?.height)
+    .padding(style?.padding as Padding)
+    .margin(style?.margin as Margin)
+    .backgroundColor(style?.backgroundColor)
+    .borderRadius(style?.borderRadius as number)
+    .layoutWeight(style?.layoutWeight)
+    .justifyContent(style?.justifyContent)
+    .alignItems(style?.alignItems)
+    .opacity(style?.opacity)
+    .borderColor(style?.borderColor)
+    .borderWidth(style?.borderWidth)
+    .onClick(props.onClick ?? undefined);
 }
 
 export interface LynxBlankProps { style?: LynxStyle; }
 
 @Builder
 export function LynxBlank(props: LynxBlankProps = {}) {
-  const component = Blank();
-  applyStyle(component, props.style);
+  const style = props.style;
+  Blank()
+    .width(style?.width)
+    .height(style?.height)
+    .padding(style?.padding as Padding)
+    .margin(style?.margin as Margin)
+    .backgroundColor(style?.backgroundColor)
+    .borderRadius(style?.borderRadius as number)
+    .layoutWeight(style?.layoutWeight)
+    .justifyContent(style?.justifyContent)
+    .alignItems(style?.alignItems)
+    .opacity(style?.opacity)
+    .borderColor(style?.borderColor)
+    .borderWidth(style?.borderWidth)
+    .onClick(props.onClick ?? undefined);
 }
 
 export interface LynxInputProps {
@@ -134,17 +189,41 @@ export interface LynxInputProps {
 
 @Builder
 export function LynxTextInput(props: LynxInputProps) {
-  const component = TextInput({ placeholder: props.placeholder, text: props.text });
-  component.type(props.type ?? InputType.Normal);
-  if (props.onChange) { component.onChange(props.onChange); }
-  applyStyle(component, props.style);
+  const style = props.style;
+  TextInput({ placeholder: props.placeholder, text: props.text })
+    .type(props.type ?? InputType.Normal)
+    .onChange(props.onChange ?? undefined)
+    .width(style?.width)
+    .height(style?.height)
+    .padding(style?.padding as Padding)
+    .margin(style?.margin as Margin)
+    .backgroundColor(style?.backgroundColor)
+    .borderRadius(style?.borderRadius as number)
+    .layoutWeight(style?.layoutWeight)
+    .justifyContent(style?.justifyContent)
+    .alignItems(style?.alignItems)
+    .opacity(style?.opacity)
+    .borderColor(style?.borderColor)
+    .borderWidth(style?.borderWidth);
 }
 
 @Builder
 export function LynxTextArea(props: LynxInputProps) {
-  const component = TextArea({ placeholder: props.placeholder, text: props.text });
-  if (props.onChange) { component.onChange(props.onChange); }
-  applyStyle(component, props.style);
+  const style = props.style;
+  TextArea({ placeholder: props.placeholder, text: props.text })
+    .onChange(props.onChange ?? undefined)
+    .width(style?.width)
+    .height(style?.height)
+    .padding(style?.padding as Padding)
+    .margin(style?.margin as Margin)
+    .backgroundColor(style?.backgroundColor)
+    .borderRadius(style?.borderRadius as number)
+    .layoutWeight(style?.layoutWeight)
+    .justifyContent(style?.justifyContent)
+    .alignItems(style?.alignItems)
+    .opacity(style?.opacity)
+    .borderColor(style?.borderColor)
+    .borderWidth(style?.borderWidth);
 }
 
 export interface LynxToggleProps {
@@ -156,9 +235,21 @@ export interface LynxToggleProps {
 
 @Builder
 export function LynxToggle(props: LynxToggleProps) {
-  const component = Toggle({ isOn: props.isOn, type: props.type ?? ToggleType.Switch });
-  if (props.onChange) { component.onChange(props.onChange); }
-  applyStyle(component, props.style);
+  const style = props.style;
+  Toggle({ isOn: props.isOn, type: props.type ?? ToggleType.Switch })
+    .onChange(props.onChange ?? undefined)
+    .width(style?.width)
+    .height(style?.height)
+    .padding(style?.padding as Padding)
+    .margin(style?.margin as Margin)
+    .backgroundColor(style?.backgroundColor)
+    .borderRadius(style?.borderRadius as number)
+    .layoutWeight(style?.layoutWeight)
+    .justifyContent(style?.justifyContent)
+    .alignItems(style?.alignItems)
+    .opacity(style?.opacity)
+    .borderColor(style?.borderColor)
+    .borderWidth(style?.borderWidth);
 }
 
 export interface LynxTabItem {
@@ -177,16 +268,28 @@ export interface LynxTabsProps {
 
 @Builder
 export function LynxTabs(props: LynxTabsProps) {
-  const component = Tabs({ index: props.index }) {
+  const style = props.style;
+  Tabs({ index: props.index }) {
     ForEach(props.items, (item: LynxTabItem, idx: number) => {
       TabContent() { item.builder(); }
         .tabBar({ text: item.title });
     }, (item: LynxTabItem, idx: number) => idx.toString());
-  };
-  component.barMode(props.barMode ?? BarMode.Fixed);
-  component.barPosition(props.barPosition ?? BarPosition.End);
-  if (props.onChange) { component.onChange(props.onChange); }
-  applyStyle(component, props.style);
+  }
+  .barMode(props.barMode ?? BarMode.Fixed)
+  .barPosition(props.barPosition ?? BarPosition.End)
+  .onChange(props.onChange ?? undefined)
+  .width(style?.width)
+  .height(style?.height)
+  .padding(style?.padding as Padding)
+  .margin(style?.margin as Margin)
+  .backgroundColor(style?.backgroundColor)
+  .borderRadius(style?.borderRadius as number)
+  .layoutWeight(style?.layoutWeight)
+  .justifyContent(style?.justifyContent)
+  .alignItems(style?.alignItems)
+  .opacity(style?.opacity)
+  .borderColor(style?.borderColor)
+  .borderWidth(style?.borderWidth);
 }
 
 export interface LynxListProps {
@@ -197,28 +300,65 @@ export interface LynxListProps {
 
 @Builder
 export function LynxList(props: LynxListProps = {}, content?: () => void) {
-  const component = List() { content && content(); };
-  if (props.divider) { component.divider(props.divider); }
-  if (props.edgeEffect !== undefined) { component.edgeEffect(props.edgeEffect); }
-  applyStyle(component, props.style);
+  const style = props.style;
+  List() { content && content(); }
+    .divider(props.divider)
+    .edgeEffect(props.edgeEffect)
+    .width(style?.width)
+    .height(style?.height)
+    .padding(style?.padding as Padding)
+    .margin(style?.margin as Margin)
+    .backgroundColor(style?.backgroundColor)
+    .borderRadius(style?.borderRadius as number)
+    .layoutWeight(style?.layoutWeight)
+    .justifyContent(style?.justifyContent)
+    .alignItems(style?.alignItems)
+    .opacity(style?.opacity)
+    .borderColor(style?.borderColor)
+    .borderWidth(style?.borderWidth)
+    .onClick(props.onClick ?? undefined);
 }
 
 export interface LynxListItemProps extends LynxContainerProps {}
 
 @Builder
 export function LynxListItem(props: LynxListItemProps = {}, content?: () => void) {
-  const component = ListItem() { content && content(); };
-  applyStyle(component, props.style);
-  if (props.onClick) { component.onClick(props.onClick); }
+  const style = props.style;
+  ListItem() { content && content(); }
+    .width(style?.width)
+    .height(style?.height)
+    .padding(style?.padding as Padding)
+    .margin(style?.margin as Margin)
+    .backgroundColor(style?.backgroundColor)
+    .borderRadius(style?.borderRadius as number)
+    .layoutWeight(style?.layoutWeight)
+    .justifyContent(style?.justifyContent)
+    .alignItems(style?.alignItems)
+    .opacity(style?.opacity)
+    .borderColor(style?.borderColor)
+    .borderWidth(style?.borderWidth)
+    .onClick(props.onClick ?? undefined);
 }
 
 export interface LynxFlexProps extends LynxContainerProps { align?: Alignment; }
 
 @Builder
 export function LynxFlex(props: LynxFlexProps = {}, content?: () => void) {
-  const component = Flex({ alignItems: props.style?.alignItems, justifyContent: props.style?.justifyContent }) {
+  const style = props.style;
+  Flex({ alignItems: style?.alignItems, justifyContent: style?.justifyContent }) {
     content && content();
-  };
-  applyStyle(component, props.style);
-  if (props.onClick) { component.onClick(props.onClick); }
+  }
+  .width(style?.width)
+  .height(style?.height)
+  .padding(style?.padding as Padding)
+  .margin(style?.margin as Margin)
+  .backgroundColor(style?.backgroundColor)
+  .borderRadius(style?.borderRadius as number)
+  .layoutWeight(style?.layoutWeight)
+  .justifyContent(style?.justifyContent)
+  .alignItems(style?.alignItems)
+  .opacity(style?.opacity)
+  .borderColor(style?.borderColor)
+  .borderWidth(style?.borderWidth)
+  .onClick(props.onClick ?? undefined);
 }
