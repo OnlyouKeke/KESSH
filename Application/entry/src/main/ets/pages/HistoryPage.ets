@@ -27,17 +27,17 @@ export default struct HistoryPage {
     LynxRow({ space: 12, style: { width: '100%', justifyContent: FlexAlign.SpaceBetween } }) {
       ForEach(this.quickActions, (icon: string, index: number) => {
         LynxColumn({
-          style: {
-            width: 64,
-            height: 64,
-            borderRadius: 18,
-            backgroundColor: '#1AE7F0F5',
-            justifyContent: FlexAlign.Center,
-            alignItems: HorizontalAlign.Center
+            style: {
+              width: 64,
+              height: 64,
+              borderRadius: 18,
+              backgroundColor: '#1AE7F0F5',
+              justifyContent: FlexAlign.Center,
+              alignItems: ItemAlign.Center
+            }
+          }) {
+            LynxText({ content: icon, style: { fontSize: 20 } })
           }
-        }) {
-          LynxText({ content: icon, style: { fontSize: 20 } })
-        }
       }, (icon: string, index: number) => index.toString())
     }
   }
