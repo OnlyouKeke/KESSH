@@ -14,82 +14,65 @@ export default struct HistoryPage {
 
   @Builder
   buildQuickActions() {
-    Row({ space: 12 }) {
+    LynxRow({ space: 12, style: { width: '100%', justifyContent: FlexAlign.SpaceBetween } }) {
       ForEach(this.quickActions, (icon: string, index: number) => {
-        Column() {
-          Text(icon)
-            .fontSize(20)
+        LynxColumn({
+          style: {
+            width: 64,
+            height: 64,
+            borderRadius: 18,
+            backgroundColor: '#1AE7F0F5',
+            justifyContent: FlexAlign.Center,
+            alignItems: HorizontalAlign.Center
+          }
+        }) {
+          LynxText({ content: icon, style: { fontSize: 20 } })
         }
-        .width(64)
-        .height(64)
-        .borderRadius(18)
-        .backgroundColor('#1AE7F0F5')
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
       }, (icon: string, index: number) => index.toString())
     }
-    .width('100%')
-    .justifyContent(FlexAlign.SpaceBetween)
   }
 
   @Builder
   buildVaultItem(item: { key: string; title: string; subtitle: string; icon: string; badge?: string }) {
-    Row() {
-      Text(item.icon)
-        .fontSize(20)
-        .margin({ right: 12 })
+    LynxRow({ style: { padding: { left: 16, right: 16, top: 14, bottom: 14 }, backgroundColor: '#10E7F0F5', borderRadius: 18 } }) {
+      LynxText({ content: item.icon, style: { fontSize: 20, margin: { right: 12 } } })
 
-      Column({ space: 4 }) {
-        Text(item.title)
-          .fontSize(16)
-          .fontWeight(FontWeight.Medium)
-        Text(item.subtitle)
-          .fontSize(13)
-          .fontColor(Color.Grey)
+      LynxColumn({ space: 4 }) {
+        LynxText({ content: item.title, style: { fontSize: 16, fontWeight: FontWeight.Medium } })
+        LynxText({ content: item.subtitle, style: { fontSize: 13, fontColor: Color.Grey } })
       }
 
-      Blank().layoutWeight(1)
+      LynxBlank({ style: { layoutWeight: 1 } })
 
-      Row({ space: 8 }) {
+      LynxRow({ space: 8 }) {
         if (item.badge) {
-          Text(item.badge)
-            .fontSize(12)
-            .fontColor('#ffffff')
-            .backgroundColor('#1E7DD6')
-            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-            .borderRadius(12)
+          LynxText({ content: item.badge, style: {
+            fontSize: 12,
+            fontColor: '#ffffff',
+            backgroundColor: '#1E7DD6',
+            padding: { left: 8, right: 8, top: 4, bottom: 4 },
+            borderRadius: 12
+          } })
         }
-        Text('›')
-          .fontSize(18)
-          .fontColor('#7A7A7A')
+        LynxText({ content: '›', style: { fontSize: 18, fontColor: '#7A7A7A' } })
       }
     }
-    .padding({ left: 16, right: 16, top: 14, bottom: 14 })
-    .backgroundColor('#10E7F0F5')
-    .borderRadius(18)
   }
 
   build() {
-    Column() {
-      Scroll() {
-        Column({ space: 16 }) {
+    LynxColumn({ style: { width: '100%', height: '100%', backgroundColor: '#F5F7FA' } }) {
+      LynxScroll({ style: { width: '100%', height: '100%' }, scrollBar: BarState.Off }) {
+        LynxColumn({ space: 16, style: { padding: { left: 16, right: 16, bottom: 20 }, width: '100%' } }) {
           this.buildQuickActions()
 
-          Column({ space: 12 }) {
+          LynxColumn({ space: 12 }) {
             ForEach(this.vaultItems, (item) => {
               this.buildVaultItem(item)
             }, (item) => item.key)
           }
         }
-        .padding({ left: 16, right: 16, bottom: 20 })
-        .width('100%')
       }
-      .scrollBar(BarState.Off)
-      .width('100%')
-      .height('100%')
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor('#F5F7FA')
   }
 }
+import { LynxBlank, LynxColumn, LynxRow, LynxText } from '../common/LynxUI';

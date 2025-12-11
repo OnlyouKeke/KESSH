@@ -1,6 +1,7 @@
 import { ConnectionStore } from '../common/Stores';
 import { SSHEngine } from '../common/NativeSSH';
 import { router } from '@kit.ArkUI';
+import { LynxBlank, LynxButton, LynxColumn, LynxRow, LynxScroll, LynxText, LynxTextInput } from '../common/LynxUI';
 
 @Entry
 @Component
@@ -59,59 +60,38 @@ export default struct Terminal {
   }
 
   build() {
-    Column() {
+    LynxColumn({ style: { width: '100%', height: '100%' } }) {
       // 顶部标题栏（返回）
-      Blank().height(36).width('100%')
-      Row() {
-        Button('<')
-          .type(ButtonType.Normal)
-          .height(36)
-          .width(36)
-          .backgroundColor('#0F000000')
-          .borderRadius(18)
-          .onClick((): void => router.back())
-        Text('终端')
-          .fontSize(24)
-          .fontWeight(FontWeight.Bold)
-          .margin({ left: 12 })
-        Blank().layoutWeight(1)
+      LynxBlank({ style: { height: 36, width: '100%' } })
+      LynxRow({ style: { height: 56, width: '100%', padding: { left: 16, right: 16 } } }) {
+        LynxButton({
+          label: '<',
+          style: { height: 36, width: 36, backgroundColor: '#0F000000', borderRadius: 18 },
+          onClick: (): void => router.back(),
+        })
+        LynxText({ content: '终端', style: { fontSize: 24, fontWeight: FontWeight.Bold, margin: { left: 12 } } })
+        LynxBlank({ style: { layoutWeight: 1 } })
       }
-      .height(56)
-      .width('100%')
-      .padding({ left: 16, right: 16 })
 
       // 输出区
-      Scroll() {
-        Column({ space: 4 }) {
+      LynxScroll({ style: { layoutWeight: 1 }, scrollBar: BarState.Off }) {
+        LynxColumn({ space: 4, style: { padding: { left: 16, right: 16, top: 8, bottom: 8 }, width: '100%' } }) {
           ForEach(this.lines, (line: string, idx: number) => {
-            Text(line)
-              .fontSize(13)
+            LynxText({ content: line, style: { fontSize: 13 } })
           }, (line: string, idx: number) => idx.toString())
         }
-        .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-        .width('100%')
       }
-      .layoutWeight(1)
-      .scrollBar(BarState.Off)
 
       // 输入区
-      Row() {
-        TextInput({ placeholder: '输入命令', text: this.cmd })
-          .onChange((v: string): void => { this.cmd = v })
-          .layoutWeight(1)
-        Blank().width(12)
-        Button('执行')
-          .type(ButtonType.Normal)
-          .height(40)
-          .backgroundColor('#222222')
-          .fontColor(Color.White)
-          .borderRadius(12)
-          .onClick((): void => { this.run(); })
+      LynxRow({ style: { padding: { left: 16, right: 16, top: 8, bottom: 16 }, width: '100%' } }) {
+        LynxTextInput({ placeholder: '输入命令', text: this.cmd, style: { layoutWeight: 1 } , onChange: (v: string): void => { this.cmd = v } })
+        LynxBlank({ style: { width: 12 } })
+        LynxButton({
+          label: '执行',
+          style: { height: 40, backgroundColor: '#222222', fontColor: Color.White, borderRadius: 12 },
+          onClick: (): void => { this.run(); }
+        })
       }
-      .padding({ left: 16, right: 16, top: 8, bottom: 16 })
-      .width('100%')
     }
-    .width('100%')
-    .height('100%')
   }
 }
