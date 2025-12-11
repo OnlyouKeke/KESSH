@@ -1,84 +1,95 @@
-import { ConnectionStore, ConnectionRecord, ConnectionDraft } from '../common/Stores';
-import { router } from '@kit.ArkUI';
-
 @Entry
 @Component
 export default struct HistoryPage {
-  @State currentIndex: number = 0;
-  @State records: Array<ConnectionRecord> = [];
+  private quickActions: Array<string> = ['\ud83d\udcc2', '\ud83d\udee1', '\ud83d\udd14'];
 
-  aboutToAppear(): void {
-    const list: Array<ConnectionRecord> = ConnectionStore.list();
-    this.records = list;
-  }
+  private vaultItems: Array<{ key: string; title: string; subtitle: string; icon: string; badge?: string }> = [
+    { key: 'hosts', title: 'Hosts', subtitle: 'Manage SSH hosts and saved sessions', icon: '\ud83d\udcbb' },
+    { key: 'keychain', title: 'Keychain', subtitle: 'Local keychain & identity', icon: '\ud83d\udd10' },
+    { key: 'port', title: 'Port forwarding', subtitle: 'Tunnels & jump hosts', icon: '\ud83d\udce6' },
+    { key: 'snippets', title: 'Snippets', subtitle: 'Reuse common commands', icon: '\ud83e\uddce' },
+    { key: 'known', title: 'Known hosts', subtitle: 'Fingerprints you trust', icon: '\ud83e\udded' },
+    { key: 'logs', title: 'Logs', subtitle: 'Recent activity and audit trail', icon: '\ud83d\uddc3', badge: '1' },
+  ];
 
-  // Method to navigate to SSHNewPage with draft data
-  private navigateToNewPage(draft: ConnectionDraft): void {
-    ConnectionStore.currentDraft = draft;
-    router.pushUrl({ url: 'pages/SSHNewPage' });
+  @Builder
+  buildQuickActions() {
+    Row({ space: 12 }) {
+      ForEach(this.quickActions, (icon: string, index: number) => {
+        Column() {
+          Text(icon)
+            .fontSize(20)
+        }
+        .width(64)
+        .height(64)
+        .borderRadius(18)
+        .backgroundColor('#1AE7F0F5')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+      }, (icon: string, index: number) => index.toString())
+    }
+    .width('100%')
+    .justifyContent(FlexAlign.SpaceBetween)
   }
 
   @Builder
-  renderEmpty() {
-    Column({ space: 12 }) {
-      Text('暂无历史记录')
-        .fontSize(16)
-        .fontColor(Color.Grey)
+  buildVaultItem(item: { key: string; title: string; subtitle: string; icon: string; badge?: string }) {
+    Row() {
+      Text(item.icon)
+        .fontSize(20)
+        .margin({ right: 12 })
+
+      Column({ space: 4 }) {
+        Text(item.title)
+          .fontSize(16)
+          .fontWeight(FontWeight.Medium)
+        Text(item.subtitle)
+          .fontSize(13)
+          .fontColor(Color.Grey)
+      }
+
+      Blank().layoutWeight(1)
+
+      Row({ space: 8 }) {
+        if (item.badge) {
+          Text(item.badge)
+            .fontSize(12)
+            .fontColor('#ffffff')
+            .backgroundColor('#1E7DD6')
+            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+            .borderRadius(12)
+        }
+        Text('›')
+          .fontSize(18)
+          .fontColor('#7A7A7A')
+      }
     }
-    .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
+    .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+    .backgroundColor('#10E7F0F5')
+    .borderRadius(18)
   }
 
   build() {
     Column() {
-      // 顶部标题与边距（无按钮）
-      Row() {
-        Text('历史记录')
-          .fontSize(22)
-          .fontWeight(FontWeight.Medium)
-        Blank().layoutWeight(1)
-      }
-      .padding({ left: 16, right: 16, top: 12, bottom: 8 })
-      .width('100%')
+      Scroll() {
+        Column({ space: 16 }) {
+          this.buildQuickActions()
 
-      if (this.records.length === 0) {
-        this.renderEmpty()
-      } else {
-        List() {
-          ForEach(this.records, (item: ConnectionRecord) => {
-            ListItem() {
-              Row() {
-                Column() {
-                  Text(item.name)
-                    .fontSize(16)
-                    .fontWeight(FontWeight.Medium)
-                  Text(item.host + ':' + item.port.toString() + ' · ' + item.time)
-                    .fontSize(12)
-                    .fontColor(Color.Grey)
-                }
-                Blank().layoutWeight(1)
-              }
-              .width('100%')
-              .height(56)
-              .padding({ left: 16, right: 16 })
-            }
-            .onClick(() => {
-              const draft: ConnectionDraft = {
-                host: item.host,
-                port: item.port.toString(),
-                username: item.username
-              };
-              this.navigateToNewPage(draft);
-            })
-          }, (item: ConnectionRecord) => item.id.toString())
+          Column({ space: 12 }) {
+            ForEach(this.vaultItems, (item) => {
+              this.buildVaultItem(item)
+            }, (item) => item.key)
+          }
         }
-        .divider({ strokeWidth: 1, color: '#11000000' })
-        .edgeEffect(EdgeEffect.None)
+        .padding({ left: 16, right: 16, bottom: 20 })
+        .width('100%')
       }
+      .scrollBar(BarState.Off)
+      .width('100%')
+      .height('100%')
     }
     .width('100%')
     .height('100%')
+    .backgroundColor('#F5F7FA')
   }
 }

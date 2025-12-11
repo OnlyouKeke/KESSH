@@ -24,24 +24,24 @@ struct Index {
       Blank().height(36).width('100%')
 
       // 一级界面标题栏（56vp）：首页不显示标题，移除右侧两个按钮
-      TitleBar({ title: this.currentIndex === 0 ? '' : (this.currentIndex === 1 ? '连接' : '设置'), showActions: false })
+      TitleBar({ title: this.currentIndex === 0 ? 'Personal' : (this.currentIndex === 1 ? 'Connections' : 'Settings'), showActions: false })
 
       // 内容区：底部 Tab
       Tabs({ index: this.currentIndex }) {
         TabContent() {
           HistoryPage({ currentIndex: this.currentIndex })
         }
-        .tabBar({ text: '首页' })
+        .tabBar({ text: 'Vaults' })
 
         TabContent() {
           SSHNewPage()
         }
-        .tabBar({ text: '连接' })
+        .tabBar({ text: 'Connections' })
 
         TabContent() {
           SettingsPage()
         }
-        .tabBar({ text: '设置' })
+        .tabBar({ text: 'Settings' })
       }
       .barPosition(BarPosition.End)
       .barMode(BarMode.Fixed)
