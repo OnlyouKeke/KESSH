@@ -3,6 +3,7 @@ import SSHNewPage from './SSHNewPage';
 import SettingsPage from './SettingsPage';
 import TitleBar from '../components/TitleBar';
 import { SSHEngine } from '../common/NativeSSH';
+import { LynxBlank, LynxColumn, LynxTabs } from '../common/LynxUI';
 
 let startupProbeDone: boolean = false;
 
@@ -19,36 +20,26 @@ struct Index {
   }
 
   build() {
-    Column() {
+    LynxColumn({ style: { height: '100%', width: '100%' } }) {
       // 信号栏占位（36vp）
-      Blank().height(36).width('100%')
+      LynxBlank({ style: { height: 36, width: '100%' } })
 
       // 一级界面标题栏（56vp）：首页不显示标题，移除右侧两个按钮
       TitleBar({ title: this.currentIndex === 0 ? 'Personal' : (this.currentIndex === 1 ? 'Connections' : 'Settings'), showActions: false })
 
       // 内容区：底部 Tab
-      Tabs({ index: this.currentIndex }) {
-        TabContent() {
-          HistoryPage({ currentIndex: this.currentIndex })
-        }
-        .tabBar({ text: 'Vaults' })
-
-        TabContent() {
-          SSHNewPage()
-        }
-        .tabBar({ text: 'Connections' })
-
-        TabContent() {
-          SettingsPage()
-        }
-        .tabBar({ text: 'Settings' })
-      }
-      .barPosition(BarPosition.End)
-      .barMode(BarMode.Fixed)
-      .layoutWeight(1)
-      .width('100%')
+      LynxTabs({
+        index: this.currentIndex,
+        barPosition: BarPosition.End,
+        barMode: BarMode.Fixed,
+        style: { layoutWeight: 1, width: '100%' },
+        onChange: (idx: number) => { this.currentIndex = idx; },
+        items: [
+          { title: 'Vaults', builder: () => HistoryPage({ currentIndex: this.currentIndex }) },
+          { title: 'Connections', builder: () => SSHNewPage() },
+          { title: 'Settings', builder: () => SettingsPage() },
+        ]
+      })
     }
-    .height('100%')
-    .width('100%')
   }
 }
