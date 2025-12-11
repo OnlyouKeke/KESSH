@@ -1,9 +1,19 @@
+import { LynxBlank, LynxColumn, LynxRow, LynxScroll, LynxText } from '../common/LynxUI';
+
+interface VaultItem {
+  key: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  badge?: string;
+}
+
 @Entry
 @Component
 export default struct HistoryPage {
   private quickActions: Array<string> = ['\ud83d\udcc2', '\ud83d\udee1', '\ud83d\udd14'];
 
-  private vaultItems: Array<{ key: string; title: string; subtitle: string; icon: string; badge?: string }> = [
+  private vaultItems: Array<VaultItem> = [
     { key: 'hosts', title: 'Hosts', subtitle: 'Manage SSH hosts and saved sessions', icon: '\ud83d\udcbb' },
     { key: 'keychain', title: 'Keychain', subtitle: 'Local keychain & identity', icon: '\ud83d\udd10' },
     { key: 'port', title: 'Port forwarding', subtitle: 'Tunnels & jump hosts', icon: '\ud83d\udce6' },
@@ -33,7 +43,7 @@ export default struct HistoryPage {
   }
 
   @Builder
-  buildVaultItem(item: { key: string; title: string; subtitle: string; icon: string; badge?: string }) {
+  buildVaultItem(item: VaultItem) {
     LynxRow({ style: { padding: { left: 16, right: 16, top: 14, bottom: 14 }, backgroundColor: '#10E7F0F5', borderRadius: 18 } }) {
       LynxText({ content: item.icon, style: { fontSize: 20, margin: { right: 12 } } })
 
@@ -46,13 +56,16 @@ export default struct HistoryPage {
 
       LynxRow({ space: 8 }) {
         if (item.badge) {
-          LynxText({ content: item.badge, style: {
-            fontSize: 12,
-            fontColor: '#ffffff',
-            backgroundColor: '#1E7DD6',
-            padding: { left: 8, right: 8, top: 4, bottom: 4 },
-            borderRadius: 12
-          } })
+          LynxText({
+            content: item.badge,
+            style: {
+              fontSize: 12,
+              fontColor: '#ffffff',
+              backgroundColor: '#1E7DD6',
+              padding: { left: 8, right: 8, top: 4, bottom: 4 },
+              borderRadius: 12
+            }
+          })
         }
         LynxText({ content: '›', style: { fontSize: 18, fontColor: '#7A7A7A' } })
       }
@@ -66,13 +79,12 @@ export default struct HistoryPage {
           this.buildQuickActions()
 
           LynxColumn({ space: 12 }) {
-            ForEach(this.vaultItems, (item) => {
+            ForEach(this.vaultItems, (item: VaultItem) => {
               this.buildVaultItem(item)
-            }, (item) => item.key)
+            }, (item: VaultItem) => item.key)
           }
         }
       }
     }
   }
 }
-import { LynxBlank, LynxColumn, LynxRow, LynxText } from '../common/LynxUI';
