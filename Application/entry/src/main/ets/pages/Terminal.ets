@@ -1,5 +1,5 @@
 import { ConnectionStore } from '../common/Stores';
-import { SSHEngine } from '../common/NativeSSH';
+import { SSHEngine } from '../common/NativeSSH.ets';
 import { router } from '@kit.ArkUI';
 import { LynxBlank, LynxButton, LynxColumn, LynxRow, LynxScroll, LynxText, LynxTextInput } from '../common/LynxUI';
 

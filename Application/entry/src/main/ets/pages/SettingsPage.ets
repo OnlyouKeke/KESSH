@@ -15,7 +15,7 @@ export default struct SettingsPage {
         // 通用设置
         LynxListItem({ style: { width: '100%', height: 56, padding: { left: 16, right: 16 } } }) {
           LynxRow() {
-            LynxColumn({ style: { alignItems: HorizontalAlign.Start, justifyContent: FlexAlign.Center, width: '70%' } }) {
+            LynxColumn({ style: { alignItems: ItemAlign.Start, justifyContent: FlexAlign.Center, width: '70%' } }) {
               LynxText({ content: '深色模式', style: { fontSize: 16 } })
               LynxText({ content: '跟随系统或手动切换', style: { fontSize: 12, fontColor: Color.Grey } })
             }
@@ -26,7 +26,7 @@ export default struct SettingsPage {
 
         LynxListItem({ style: { width: '100%', height: 56, padding: { left: 16, right: 16 } } }) {
           LynxRow() {
-            LynxColumn({ style: { alignItems: HorizontalAlign.Start, justifyContent: FlexAlign.Center, width: '70%' } }) {
+            LynxColumn({ style: { alignItems: ItemAlign.Start, justifyContent: FlexAlign.Center, width: '70%' } }) {
               LynxText({ content: '保存密码', style: { fontSize: 16 } })
               LynxText({ content: '使用本地安全存储', style: { fontSize: 12, fontColor: Color.Grey } })
             }
