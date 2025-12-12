@@ -1,5 +1,5 @@
 import { ConnectionStore } from '../common/Stores';
-import { SSHEngine } from '../common/NativeSSH.ets';
+import { SSHEngine } from '../common/NativeSSH';
 import { router } from '@kit.ArkUI';
 import { LynxBlank, LynxButton, LynxColumn, LynxRow, LynxScroll, LynxText, LynxTextInput } from '../common/LynxUI';
 
@@ -24,12 +24,12 @@ export default struct Terminal {
         this.sessionId = SSHEngine.openSessionPassword(d.host, port, d.username, d.password || '');
       }
       // 轮询读取输出
-      if (this.sessionId > 0) {
-        const tid = setInterval(() => {
-          const chunk = SSHEngine.termRead(this.sessionId);
-          if (chunk && chunk.length > 0) {
-            this.lines.push(chunk);
-          }
+        if (this.sessionId > 0) {
+          const tid = setInterval(() => {
+            const chunk: string = SSHEngine.termRead(this.sessionId);
+            if (chunk && chunk.length > 0) {
+              this.lines.push(chunk);
+            }
         }, 150) as number;
         this.timerId = tid;
       } else {
