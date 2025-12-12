@@ -2,7 +2,7 @@ import HistoryPage from './HistoryPage';
 import SSHNewPage from './SSHNewPage';
 import SettingsPage from './SettingsPage';
 import TitleBar from '../components/TitleBar';
-import { SSHEngine } from '../common/NativeSSH.ets';
+import { SSHEngine } from '../common/NativeSSH';
 import { LynxBlank, LynxColumn, LynxTabs } from '../common/LynxUI';
 
 let startupProbeDone: boolean = false;
@@ -28,18 +28,18 @@ struct Index {
       TitleBar({ title: this.currentIndex === 0 ? 'Personal' : (this.currentIndex === 1 ? 'Connections' : 'Settings'), showActions: false })
 
       // 内容区：底部 Tab
-      LynxTabs({
-        index: this.currentIndex,
-        barPosition: BarPosition.End,
-        barMode: BarMode.Fixed,
-        style: { layoutWeight: 1, width: '100%' },
-        onChange: (idx: number): void => { this.currentIndex = idx; },
-        items: [
-          { title: 'Vaults', builder: (): void => HistoryPage() },
-          { title: 'Connections', builder: (): void => SSHNewPage() },
-          { title: 'Settings', builder: (): void => SettingsPage() },
-        ]
-      })
+        LynxTabs({
+          index: this.currentIndex,
+          barPosition: BarPosition.End,
+          barMode: BarMode.Fixed,
+          style: { layoutWeight: 1, width: '100%' },
+          onChange: (idx: number): void => { this.currentIndex = idx; },
+          items: [
+            { title: 'Vaults', builder: (): void => { HistoryPage(); } },
+            { title: 'Connections', builder: (): void => { SSHNewPage(); } },
+            { title: 'Settings', builder: (): void => { SettingsPage(); } },
+          ]
+        })
+      }
     }
   }
-}
