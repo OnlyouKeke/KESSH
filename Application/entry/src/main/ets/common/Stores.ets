@@ -1,28 +1,11 @@
+import { AppStorage } from '@kit.ArkUI';
 import hilog from '@ohos.hilog';
 import { SecurityUtils } from './SecurityUtils';
-import { AccountManager } from './AccountManager';
-import preferences from '@ohos.data.preferences';
-import type { Context } from '@kit.AbilityKit';
 
 const APPLOG_DOMAIN = 0xD15A;
 const APPLOG_TAG = 'AppLogger';
-const PREF_NAME = 'kessh_data';
-const KEY_CONNECTIONS = 'connections';
-const KEY_SEQ = 'connection_seq';
-const KEY_FIRST_LAUNCH = 'first_launch';
-const KEY_KEEPALIVE_INTERVAL = 'session_keepalive_interval';
-const KEY_KEEPALIVE_ATTEMPTS = 'session_keepalive_attempts';
-const KEY_TERMINAL_FONT_SIZE = 'terminal_font_size';
-const KEY_TERMINAL_FONT_FAMILY = 'terminal_font_family';
-
-const DEFAULT_KEEPALIVE_INTERVAL = 30;
-const DEFAULT_KEEPALIVE_ATTEMPTS = 3;
-const DEFAULT_TERMINAL_FONT_SIZE = 14;
-const DEFAULT_TERMINAL_FONT_FAMILY = 'system';
 
 export type AuthType = 'password' | 'key';
-export type ConnectionStatus = 'success' | 'failed' | 'timeout' | 'refused' | 'auth_failed';
-export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 export interface ConnectionDraft {
   host: string;
@@ -32,8 +15,6 @@ export interface ConnectionDraft {
   privateKey?: string;
   publicKey?: string;
   passphrase?: string;
-  isEditing?: boolean; // 是否为编辑模式
-  editingId?: number; // 编辑的记录ID
 }
 
 export interface ConnectionRecord {
@@ -44,11 +25,6 @@ export interface ConnectionRecord {
   username: string;
   authType: AuthType;
   time: string; // display time
-  timestamp: number; // Unix timestamp for sorting
-  status?: ConnectionStatus; // 连接结果状态
-  errorMsg?: string; // 错误消息
-  duration?: number; // 连接耗时(ms)
-  encryptedPassword?: string; // 加密后的密码（Base64）
 }
 
 export interface ImportedKey {
@@ -60,545 +36,79 @@ export interface ImportedKey {
   fingerprint?: string; // SHA-256 digest for display
 }
 
-interface KeyBackupEntry {
-  name: string;
-  content: string;
-  publicKey?: string;
-  passphrase?: string;
-  fingerprint?: string;
-}
-
-interface KeyBackupFile {
-  version: string;
-  createdAt: number;
-  count: number;
-  payload: string;
-}
-
-export interface KeyImportStats {
-  imported: number;
-  skipped: number;
-  total: number;
-}
-
-export interface LogEntry {
-  id: number;
-  timestamp: number;
-  level: LogLevel;
-  message: string;
-  timeStr: string;
-}
-
 export class Logger {
-  private static logs: Array<LogEntry> = [];
-  private static seq: number = 1;
-  private static readonly MAX_LOGS = 500; // 最多保存500条日志
+  private static logs: Array<string> = [];
 
-  static log(message: string, level: LogLevel = 'INFO'): void {
+  static log(message: string): void {
     const ts = new Date();
-    const timeStr = `${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}:${ts.getSeconds().toString().padStart(2,'0')}.${ts.getMilliseconds().toString().padStart(3,'0')}`;
-    
-    const entry: LogEntry = {
-      id: Logger.seq++,
-      timestamp: ts.getTime(),
-      level,
-      message,
-      timeStr
-    };
-    
-    Logger.logs.unshift(entry);
-    
-    // 限制日志数量
-    if (Logger.logs.length > Logger.MAX_LOGS) {
-      Logger.logs = Logger.logs.slice(0, Logger.MAX_LOGS);
-    }
-    
-    // 输出到hilog
-    switch (level) {
-      case 'DEBUG':
-        hilog.debug(APPLOG_DOMAIN, APPLOG_TAG, '%{public}s', message);
-        break;
-      case 'INFO':
-        hilog.info(APPLOG_DOMAIN, APPLOG_TAG, '%{public}s', message);
-        break;
-      case 'WARN':
-        hilog.warn(APPLOG_DOMAIN, APPLOG_TAG, '%{public}s', message);
-        break;
-      case 'ERROR':
-        hilog.error(APPLOG_DOMAIN, APPLOG_TAG, '%{public}s', message);
-        break;
-    }
+    const timeStr = `${ts.getHours().toString().padStart(2,'0')}:${ts.getMinutes().toString().padStart(2,'0')}:${ts.getSeconds().toString().padStart(2,'0')}`;
+    Logger.logs.unshift(`[${timeStr}] ${message}`);
+    hilog.debug(APPLOG_DOMAIN, APPLOG_TAG, '%{public}s', message);
   }
-  
-  static debug(message: string): void { Logger.log(message, 'DEBUG'); }
-  static info(message: string): void { Logger.log(message, 'INFO'); }
-  static warn(message: string): void { Logger.log(message, 'WARN'); }
-  static error(message: string): void { Logger.log(message, 'ERROR'); }
 
-  static list(level?: LogLevel): Array<LogEntry> {
-    if (level) {
-      return Logger.logs.filter(entry => entry.level === level);
-    }
+  static list(): Array<string> {
     return Logger.logs;
   }
 
   static clear(): void {
     Logger.logs = [];
-    Logger.seq = 1;
-    Logger.info('Logger: 日志已清空');
-  }
-  
-  static export(): string {
-    let output = `=== SSH Client Logs ===\n`;
-    output += `Generated at: ${new Date().toLocaleString()}\n`;
-    output += `Total entries: ${Logger.logs.length}\n`;
-    output += `\n`;
-    
-    const reversedLogs = [...Logger.logs].reverse();
-    for (const entry of reversedLogs) {
-      output += `[${entry.timeStr}] [${entry.level}] ${entry.message}\n`;
-    }
-    
-    return output;
   }
 }
 
-export class SettingsStore {
-  static darkMode: boolean = false;
-  static savePassword: boolean = false;
-  static sessionKeepaliveInterval: number = DEFAULT_KEEPALIVE_INTERVAL;
-  static sessionKeepaliveAttempts: number = DEFAULT_KEEPALIVE_ATTEMPTS;
-  static terminalFontSize: number = DEFAULT_TERMINAL_FONT_SIZE;
-  static terminalFontFamily: string = DEFAULT_TERMINAL_FONT_FAMILY;
-  private static prefStore: preferences.Preferences | null = null;
-  private static isFirstLaunch: boolean = true;
-
-  static async init(context: Context): Promise<void> {
-    try {
-      SettingsStore.prefStore = await preferences.getPreferences(context, PREF_NAME);
-      
-      // 读取首次启动标记
-      const firstLaunch = await SettingsStore.prefStore.get(KEY_FIRST_LAUNCH, true);
-      SettingsStore.isFirstLaunch = firstLaunch as boolean;
-      const keepaliveInterval = await SettingsStore.prefStore.get(KEY_KEEPALIVE_INTERVAL, DEFAULT_KEEPALIVE_INTERVAL);
-      const keepaliveAttempts = await SettingsStore.prefStore.get(KEY_KEEPALIVE_ATTEMPTS, DEFAULT_KEEPALIVE_ATTEMPTS);
-      const terminalFontSize = await SettingsStore.prefStore.get(KEY_TERMINAL_FONT_SIZE, DEFAULT_TERMINAL_FONT_SIZE);
-      const terminalFontFamily = await SettingsStore.prefStore.get(KEY_TERMINAL_FONT_FAMILY, DEFAULT_TERMINAL_FONT_FAMILY);
-
-      SettingsStore.sessionKeepaliveInterval = typeof keepaliveInterval === 'number' ? keepaliveInterval : DEFAULT_KEEPALIVE_INTERVAL;
-      SettingsStore.sessionKeepaliveAttempts = typeof keepaliveAttempts === 'number' ? keepaliveAttempts : DEFAULT_KEEPALIVE_ATTEMPTS;
-      SettingsStore.terminalFontSize = typeof terminalFontSize === 'number' ? terminalFontSize : DEFAULT_TERMINAL_FONT_SIZE;
-      SettingsStore.terminalFontFamily = typeof terminalFontFamily === 'string' && terminalFontFamily.length > 0
-        ? terminalFontFamily
-        : DEFAULT_TERMINAL_FONT_FAMILY;
-      
-      Logger.info(`SettingsStore: 初始化完成, 首次启动=${SettingsStore.isFirstLaunch}`);
-    } catch (err) {
-      Logger.error(`SettingsStore: 初始化失败 ${err}`);
-    }
-  }
-
-  private static async persistPreference(key: string, value: number | string): Promise<void> {
-    if (!SettingsStore.prefStore) {
-      Logger.warn(`SettingsStore: 偏好存储未初始化, key=${key}`);
-      return;
-    }
-    try {
-      await SettingsStore.prefStore.put(key, value);
-      await SettingsStore.prefStore.flush();
-    } catch (err) {
-      Logger.error(`SettingsStore: 保存设置失败 key=${key}, err=${err}`);
-    }
-  }
-
-  static async markNotFirstLaunch(): Promise<void> {
-    if (!SettingsStore.prefStore) return;
-    
-    try {
-      SettingsStore.isFirstLaunch = false;
-      await SettingsStore.prefStore.put(KEY_FIRST_LAUNCH, false);
-      await SettingsStore.prefStore.flush();
-      Logger.info('SettingsStore: 已标记为非首次启动');
-    } catch (err) {
-      Logger.error(`SettingsStore: 保存首次启动标记失败 ${err}`);
-    }
-  }
-
-  static checkIsFirstLaunch(): boolean {
-    return SettingsStore.isFirstLaunch;
-  }
-
-  static setDarkMode(v: boolean): void { 
-    SettingsStore.darkMode = v; 
-    Logger.info(`设置: 深色模式=${v ? '开' : '关'}`);
-  }
-  
-  static setSavePassword(v: boolean): void { 
-    SettingsStore.savePassword = v; 
-    Logger.info(`设置: 保存密码=${v ? '开' : '关'}`);
-  }
-
-  static async setSessionKeepaliveInterval(value: number): Promise<void> {
-    const sanitized = Math.min(600, Math.max(5, Math.round(value || DEFAULT_KEEPALIVE_INTERVAL)));
-    SettingsStore.sessionKeepaliveInterval = sanitized;
-    await SettingsStore.persistPreference(KEY_KEEPALIVE_INTERVAL, sanitized);
-    Logger.info(`设置: 会话保活间隔=${sanitized}s`);
-  }
-
-  static async setSessionKeepaliveAttempts(value: number): Promise<void> {
-    const sanitized = Math.min(10, Math.max(1, Math.round(value || DEFAULT_KEEPALIVE_ATTEMPTS)));
-    SettingsStore.sessionKeepaliveAttempts = sanitized;
-    await SettingsStore.persistPreference(KEY_KEEPALIVE_ATTEMPTS, sanitized);
-    Logger.info(`设置: 会话保活尝试=${sanitized}次`);
-  }
-
-  static async setTerminalFontSize(value: number): Promise<void> {
-    const sanitized = Math.min(28, Math.max(10, Math.round(value || DEFAULT_TERMINAL_FONT_SIZE)));
-    SettingsStore.terminalFontSize = sanitized;
-    await SettingsStore.persistPreference(KEY_TERMINAL_FONT_SIZE, sanitized);
-    Logger.info(`设置: 终端字体大小=${sanitized}`);
-  }
-
-  static async setTerminalFontFamily(value: string): Promise<void> {
-    const trimmed = value ? value.trim() : '';
-    const sanitized = trimmed.length > 0 ? trimmed : DEFAULT_TERMINAL_FONT_FAMILY;
-    SettingsStore.terminalFontFamily = sanitized;
-    await SettingsStore.persistPreference(KEY_TERMINAL_FONT_FAMILY, sanitized);
-    Logger.info(`设置: 终端字体=${sanitized}`);
-  }
-}
-// 导入结果类型
-export interface ImportResult {
-  success: number;
-  failed: number;
-  total: number;
+export class SettingsStore {
+  static readonly DARK_MODE_KEY = 'lynx_dark_mode';
+  static readonly SAVE_PASSWORD_KEY = 'lynx_save_password';
+
+  static ensureInitialized(): void {
+    if (!AppStorage.has(SettingsStore.DARK_MODE_KEY)) {
+      AppStorage.setOrCreate(SettingsStore.DARK_MODE_KEY, false);
+    }
+    if (!AppStorage.has(SettingsStore.SAVE_PASSWORD_KEY)) {
+      AppStorage.setOrCreate(SettingsStore.SAVE_PASSWORD_KEY, false);
+    }
+  }
+
+  static get darkMode(): boolean { return AppStorage.get<boolean>(SettingsStore.DARK_MODE_KEY) ?? false; }
+  static get savePassword(): boolean { return AppStorage.get<boolean>(SettingsStore.SAVE_PASSWORD_KEY) ?? false; }
+
+  static setDarkMode(v: boolean): void {
+    AppStorage.setOrCreate(SettingsStore.DARK_MODE_KEY, v);
+    Logger.log(`设置: 深色模式=${v ? '开' : '关'}`);
+  }
+
+  static setSavePassword(v: boolean): void {
+    AppStorage.setOrCreate(SettingsStore.SAVE_PASSWORD_KEY, v);
+    Logger.log(`设置: 保存密码=${v ? '开' : '关'}`);
+  }
 }
 
 export class ConnectionStore {
   private static seq: number = 1;
   private static history: Array<ConnectionRecord> = [];
   static currentDraft: ConnectionDraft | null = null;
-  private static prefStore: preferences.Preferences | null = null;
-  private static initialized: boolean = false;
 
-  // 初始化数据库
-  /**
-   * 使用AES加密密码
-   */
-  private static encryptPassword(password: string): string {
-    try {
-      // 使用用户ID作为加密密钥
-      const encryptionKey = AccountManager.getEncryptionKey();
-      return SecurityUtils.aesEncrypt(password, encryptionKey);
-    } catch (err) {
-      Logger.error(`密码加密失败: ${err}`);
-      return '';
-    }
-  }
-  
-  /**
-   * 解密密码
-   */
-  private static decryptPassword(encrypted: string): string {
-    try {
-      // 使用用户ID作为解密密钥
-      const encryptionKey = AccountManager.getEncryptionKey();
-      return SecurityUtils.aesDecrypt(encrypted, encryptionKey);
-    } catch (err) {
-      Logger.error(`密码解密失败: ${err}`);
-      return '';
-    }
-  }
-
-  static async init(context: Context): Promise<void> {
-    if (ConnectionStore.initialized) return;
-    
-    try {
-      ConnectionStore.prefStore = await preferences.getPreferences(context, PREF_NAME);
-      
-      // 读取序列号
-      const seqValue = await ConnectionStore.prefStore.get(KEY_SEQ, 1);
-      ConnectionStore.seq = seqValue as number;
-      
-      // 读取历史记录
-      const historyJson = await ConnectionStore.prefStore.get(KEY_CONNECTIONS, '[]');
-      ConnectionStore.history = JSON.parse(historyJson as string);
-      
-      ConnectionStore.initialized = true;
-      Logger.info(`ConnectionStore: 初始化完成, 加载${ConnectionStore.history.length}条记录`);
-    } catch (err) {
-      Logger.error(`ConnectionStore: 初始化失败 ${err}`);
-    }
-  }
-  
-  // 保存到数据库
-  private static async save(): Promise<void> {
-    if (!ConnectionStore.prefStore) return;
-    
-    try {
-      await ConnectionStore.prefStore.put(KEY_SEQ, ConnectionStore.seq);
-      await ConnectionStore.prefStore.put(KEY_CONNECTIONS, JSON.stringify(ConnectionStore.history));
-      await ConnectionStore.prefStore.flush();
-    } catch (err) {
-      Logger.error(`ConnectionStore: 保存失败 ${err}`);
-    }
-  }
-
-  static addFromDraft(draft: ConnectionDraft, authType: AuthType, status?: ConnectionStatus, errorMsg?: string, duration?: number, savePassword: boolean = false): ConnectionRecord {
-    const ts = new Date();
-    
-    // 检查是否已存在相同的主机+用户名组合
-    const existingIndex = ConnectionStore.history.findIndex(r => 
-      r.host === draft.host && 
-      r.port === parseInt(draft.port || '22') && 
-      r.username === draft.username
-    );
-    
+  static addFromDraft(draft: ConnectionDraft, authType: AuthType): ConnectionRecord {
     const record: ConnectionRecord = {
-      id: existingIndex >= 0 ? ConnectionStore.history[existingIndex].id : ConnectionStore.seq++,
+      id: ConnectionStore.seq++,
       name: `${draft.username}@${draft.host}:${draft.port}`,
       host: draft.host,
       port: parseInt(draft.port || '22'),
       username: draft.username,
       authType,
-      time: ConnectionStore.formatTime(ts),
-      timestamp: ts.getTime(),
-      status,
-      errorMsg,
-      duration
+      time: ConnectionStore.nowLabel()
     };
-    
-    // 如果需要保存密码且密码存在，则加密保存
-    if (savePassword && draft.password) {
-      record.encryptedPassword = ConnectionStore.encryptPassword(draft.password);
-      Logger.info(`历史: 已加密保存密码`);
-    }
-    
-    // 如果存在相同配置，删除旧的
-    if (existingIndex >= 0) {
-      ConnectionStore.history.splice(existingIndex, 1);
-      Logger.info(`历史: 更新已存在的主机 ${record.name}`);
-    }
-    
-    // 添加到列表开头
     ConnectionStore.history.unshift(record);
-    
-    // 限制历史记录数量
-    if (ConnectionStore.history.length > 100) {
-      ConnectionStore.history = ConnectionStore.history.slice(0, 100);
-    }
-    
-    const statusText = status === 'success' ? '成功' : status === 'failed' ? '失败' : status === 'timeout' ? '超时' : status === 'refused' ? '被拒' : status === 'auth_failed' ? '认证失败' : '未知';
-    Logger.info(`历史: 新增 ${record.name} [状态:${statusText}${duration ? `, 耗时:${duration}ms` : ''}]`);
-    
-    // 保存到数据库
-    ConnectionStore.save();
-    
+    Logger.log(`历史: 新增 ${record.name}`);
     return record;
   }
-  
-  static updateStatus(id: number, status: ConnectionStatus, errorMsg?: string, duration?: number): void {
-    const record = ConnectionStore.history.find(r => r.id === id);
-    if (record) {
-      record.status = status;
-      record.errorMsg = errorMsg;
-      record.duration = duration;
-    }
-  }
 
-  static list(): Array<ConnectionRecord> { 
-    return ConnectionStore.history; 
-  }
-  
-  static remove(id: number): void {
-    const record = ConnectionStore.history.find(r => r.id === id);
-    if (record) {
-      ConnectionStore.history = ConnectionStore.history.filter(r => r.id !== id);
-      Logger.info(`历史: 删除 ${record.name}`);
-      ConnectionStore.save();
-    }
-  }
-  
-  static clearAll(): void {
-    ConnectionStore.history = [];
-    Logger.info('历史: 清空所有记录');
-    ConnectionStore.save();
-  }
+  static list(): Array<ConnectionRecord> { return ConnectionStore.history; }
 
-  /**
-   * 获取已保存的密码（解密）
-   */
-  static getPassword(record: ConnectionRecord): string {
-    if (record.encryptedPassword) {
-      return ConnectionStore.decryptPassword(record.encryptedPassword);
-    }
-    return '';
-  }
-  
-  /**
-   * 导出配置文件（JSON格式）
-   */
-  static exportConfig(): string {
-    const account = AccountManager.getCurrentAccount();
-    
-    interface ConnectionExport {
-      id: number;
-      name: string;
-      host: string;
-      port: number;
-      username: string;
-      authType: AuthType;
-      encryptedPassword?: string;
-      timestamp: number;
-    }
-    
-    interface ExportData {
-      version: string;
-      exportTime: string;
-      accountId: string;
-      accountName: string;
-      connections: ConnectionExport[];
-    }
-    
-    const exportData: ExportData = {
-      version: '1.0',
-      exportTime: new Date().toISOString(),
-      accountId: account?.openId || 'anonymous',
-      accountName: account?.displayName || '未登录用户',
-      connections: ConnectionStore.history.map(record => {
-        const conn: ConnectionExport = {
-          id: record.id,
-          name: record.name,
-          host: record.host,
-          port: record.port,
-          username: record.username,
-          authType: record.authType,
-          encryptedPassword: record.encryptedPassword,
-          timestamp: record.timestamp
-        };
-        return conn;
-      })
-    };
-    
-    Logger.info(`导出配置: ${exportData.connections.length}条记录`);
-    return JSON.stringify(exportData, null, 2);
-  }
-  
-  /**
-   * 导入配置文件
-   */
-  static async importConfig(jsonContent: string): Promise<ImportResult> {
-    interface ConnectionImport {
-      id: number;
-      name: string;
-      host: string;
-      port: number;
-      username: string;
-      authType: AuthType;
-      encryptedPassword?: string;
-      timestamp: number;
-    }
-    
-    interface ImportData {
-      version: string;
-      accountName: string;
-      connections: ConnectionImport[];
-    }
-    
-    try {
-      const importData: ImportData = JSON.parse(jsonContent) as ImportData;
-      
-      // 验证数据格式
-      if (!importData.version || !importData.connections) {
-        throw new Error('无效的配置文件格式');
-      }
-      
-      const account = AccountManager.getCurrentAccount();
-      
-      Logger.info(`导入配置: 来源账号=${importData.accountName}, 当前账号=${account?.displayName || '未登录'}`);
-      
-      let successCount = 0;
-      let failedCount = 0;
-      
-      for (const conn of importData.connections) {
-        try {
-          // 检查是否已存在
-          const existingIndex = ConnectionStore.history.findIndex(r => 
-            r.host === conn.host && 
-            r.port === conn.port && 
-            r.username === conn.username
-          );
-          
-          const record: ConnectionRecord = {
-            id: existingIndex >= 0 ? ConnectionStore.history[existingIndex].id : ConnectionStore.seq++,
-            name: conn.name,
-            host: conn.host,
-            port: conn.port,
-            username: conn.username,
-            authType: conn.authType,
-            time: ConnectionStore.formatTime(new Date(conn.timestamp)),
-            timestamp: conn.timestamp,
-            encryptedPassword: conn.encryptedPassword
-          };
-          
-          // 如果存在相同配置，删除旧的
-          if (existingIndex >= 0) {
-            ConnectionStore.history.splice(existingIndex, 1);
-          }
-          
-          ConnectionStore.history.unshift(record);
-          successCount++;
-          
-        } catch (err) {
-          Logger.error(`导入单条记录失败: ${err}`);
-          failedCount++;
-        }
-      }
-      
-      // 保存到数据库
-      await ConnectionStore.save();
-      
-      Logger.info(`导入完成: 成功${successCount}条, 失败${failedCount}条`);
-      
-      const result: ImportResult = {
-        success: successCount,
-        failed: failedCount,
-        total: importData.connections.length
-      };
-      return result;
-      
-    } catch (err) {
-      const error = err as Error;
-      Logger.error(`导入配置失败: ${error.message}`);
-      throw new Error(`导入失败: ${error.message}`);
-    }
-  }
-  
-  static formatTime(date: Date): string {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const hh = date.getHours().toString().padStart(2,'0');
-    const mm = date.getMinutes().toString().padStart(2,'0');
-    
-    // 今天
-    if (diff < 24 * 60 * 60 * 1000 && now.getDate() === date.getDate()) {
-      return `今天 ${hh}:${mm}`;
-    }
-    // 昨天
-    else if (diff < 48 * 60 * 60 * 1000 && now.getDate() - date.getDate() === 1) {
-      return `昨天 ${hh}:${mm}`;
-    }
-    // 其他
-    else {
-      const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      const day = date.getDate().toString().padStart(2, '0');
-      return `${month}-${day} ${hh}:${mm}`;
-    }
-  }
-  
-  // 兼容旧接口
   static nowLabel(): string {
-    return ConnectionStore.formatTime(new Date());
+    const d = new Date();
+    const hh = d.getHours().toString().padStart(2,'0');
+    const mm = d.getMinutes().toString().padStart(2,'0');
+    return `今天 ${hh}:${mm}`;
   }
 }
 
@@ -610,7 +120,7 @@ export class KeyStore {
     const fingerprint = SecurityUtils.sha256Hex(content);
     const k: ImportedKey = { id: KeyStore.seq++, name, content, publicKey, passphrase, fingerprint };
     KeyStore.keys.unshift(k);
-    Logger.info(`密钥: 导入 ${name}${fingerprint ? ` fingerprint=${fingerprint.slice(0, 12)}…` : ''}`);
+    Logger.log(`密钥: 导入 ${name}${fingerprint ? ` fingerprint=${fingerprint.slice(0, 12)}…` : ''}`);
     return k;
   }
 
@@ -624,87 +134,6 @@ export class KeyStore {
   }
 
   static remove(id: number): void {
-    const key = KeyStore.keys.find(k => k.id === id);
-    if (key) {
-      KeyStore.keys = KeyStore.keys.filter(k => k.id !== id);
-      Logger.info(`密钥: 删除 ${key.name}`);
-    }
-  }
-
-  static exportEncrypted(password: string): string {
-    if (!password || password.trim().length === 0) {
-      throw new Error('导出密码不能为空');
-    }
-    if (KeyStore.keys.length === 0) {
-      throw new Error('暂无密钥可导出');
-    }
-    const entries: Array<KeyBackupEntry> = [];
-    for (const key of KeyStore.keys) {
-      const entry: KeyBackupEntry = {
-        name: key.name,
-        content: key.content,
-        publicKey: key.publicKey,
-        passphrase: key.passphrase,
-        fingerprint: key.fingerprint
-      };
-      entries.push(entry);
-    }
-    const backup: KeyBackupFile = {
-      version: '1.0',
-      createdAt: Date.now(),
-      count: entries.length,
-      payload: SecurityUtils.aesEncrypt(JSON.stringify(entries), password)
-    };
-    Logger.info(`密钥: 导出${entries.length}条记录`);
-    return JSON.stringify(backup, null, 2);
-  }
-
-  static importEncrypted(jsonContent: string, password: string): KeyImportStats {
-    if (!password || password.trim().length === 0) {
-      throw new Error('导入密码不能为空');
-    }
-    const backup = JSON.parse(jsonContent) as KeyBackupFile;
-    if (!backup || !backup.payload) {
-      throw new Error('无效的密钥备份文件');
-    }
-    const decrypted = SecurityUtils.aesDecrypt(backup.payload, password);
-    const entries = JSON.parse(decrypted) as Array<KeyBackupEntry>;
-    if (!entries || entries.length === 0) {
-      throw new Error('备份文件中没有密钥数据');
-    }
-
-    const fingerprints = new Set<string>();
-    for (const existing of KeyStore.keys) {
-      if (existing.fingerprint) {
-        fingerprints.add(existing.fingerprint);
-      }
-    }
-
-    let imported = 0;
-    let skipped = 0;
-    for (const entry of entries) {
-      if (!entry.content || !entry.name) {
-        skipped++;
-        continue;
-      }
-      const fingerprint = SecurityUtils.sha256Hex(entry.content);
-      if (fingerprints.has(fingerprint)) {
-        skipped++;
-        continue;
-      }
-      const importedKey = KeyStore.importKey(entry.name, entry.content, entry.publicKey, entry.passphrase);
-      if (importedKey.fingerprint) {
-        fingerprints.add(importedKey.fingerprint);
-      }
-      imported++;
-    }
-
-    Logger.info(`密钥: 备份导入完成 imported=${imported} skipped=${skipped}`);
-    const summary: KeyImportStats = {
-      imported,
-      skipped,
-      total: entries.length
-    };
-    return summary;
+    KeyStore.keys = KeyStore.keys.filter(k => k.id !== id);
   }
 }
