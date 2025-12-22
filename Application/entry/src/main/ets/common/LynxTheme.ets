@@ -1,14 +1,13 @@
-import { ResourceColor } from '@kit.ArkUI';
 import { SettingsStore } from './Stores';
 
 export interface LynxPalette {
-  pageBackground: ResourceColor;
-  surface: ResourceColor;
-  card: ResourceColor;
-  primaryText: ResourceColor;
-  secondaryText: ResourceColor;
-  border: ResourceColor;
-  accent: ResourceColor;
+  pageBackground: string;
+  surface: string;
+  card: string;
+  primaryText: string;
+  secondaryText: string;
+  border: string;
+  accent: string;
 }
 
 const lightPalette: LynxPalette = {

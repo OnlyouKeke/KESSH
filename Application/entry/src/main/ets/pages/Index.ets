@@ -2,8 +2,8 @@ import HistoryPage from './HistoryPage';
 import SSHNewPage from './SSHNewPage';
 import SettingsPage from './SettingsPage';
 import TitleBar from '../components/TitleBar';
-import { SSHEngine } from '../common/NativeSSH';
-import { LynxBlank, LynxColumn, LynxTabs } from '../common/LynxUI';
+import { SSHEngine } from '../common/SSHEngine';
+import { LynxBlank } from '../common/LynxUI';
 import { SettingsStore } from '../common/Stores';
 import { getLynxPalette, LynxPalette } from '../common/LynxTheme';
 
@@ -25,26 +25,30 @@ struct Index {
   }
 
   build() {
-    LynxColumn({ style: { height: '100%', width: '100%', backgroundColor: this.palette.pageBackground } }) {
-      // 信号栏占位（36vp）
+    Column() {
+      // 状态栏占位
       LynxBlank({ style: { height: 36, width: '100%' } })
 
-      // 一级界面标题栏（56vp）：首页不显示标题，移除右侧两个按钮
+      // 顶部标题栏
       TitleBar({ title: this.currentIndex === 0 ? 'Personal' : (this.currentIndex === 1 ? 'Connections' : 'Settings'), showActions: false })
 
-      // 内容区：底部 Tab
-        LynxTabs({
-          index: this.currentIndex,
-          barPosition: BarPosition.End,
-          barMode: BarMode.Fixed,
-          style: { layoutWeight: 1, width: '100%' },
-          onChange: (idx: number): void => { this.currentIndex = idx; },
-          items: [
-            { title: 'Vaults', builder: (): void => { HistoryPage(); } },
-            { title: 'Connections', builder: (): void => { SSHNewPage(); } },
-            { title: 'Settings', builder: (): void => { SettingsPage(); } },
-          ]
-        })
+      // Tab 内容
+      Tabs({ index: this.currentIndex }) {
+        TabContent() { HistoryPage(); }
+          .tabBar({ text: 'Vaults' });
+        TabContent() { SSHNewPage(); }
+          .tabBar({ text: 'Connections' });
+        TabContent() { SettingsPage(); }
+          .tabBar({ text: 'Settings' });
       }
+      .barPosition(BarPosition.End)
+      .barMode(BarMode.Fixed)
+      .onChange((idx: number): void => { this.currentIndex = idx; })
+      .layoutWeight(1)
+      .width('100%');
     }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.palette.pageBackground);
   }
+}

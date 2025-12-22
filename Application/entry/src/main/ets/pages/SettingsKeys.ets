@@ -1,6 +1,5 @@
 import { KeyStore, ImportedKey } from '../common/Stores';
-import { promptAction } from '@kit.ArkUI';
-import { router } from '@kit.ArkUI';
+import { promptAction, router } from '@kit.ArkUI';
 import { LynxBlank, LynxButton, LynxColumn, LynxList, LynxListItem, LynxRow, LynxText, LynxTextArea, LynxTextInput } from '../common/LynxUI';
 
 @Entry
@@ -13,7 +12,7 @@ export default struct SettingsKeys {
 
   build() {
     LynxColumn({ style: { width: '100%', height: '100%' } }) {
-      // 顶部：状态栏占位 + 标题栏（返回）
+      // Top bar
       LynxBlank({ style: { height: 36, width: '100%' } })
       LynxRow({ style: { height: 56, width: '100%', padding: { left: 16, right: 16 } } }) {
         LynxButton({
@@ -21,35 +20,44 @@ export default struct SettingsKeys {
           style: { height: 36, width: 36, backgroundColor: '#0F000000', borderRadius: 18 },
           onClick: (): void => router.back(),
         })
-        LynxText({ content: '密钥管理', style: { fontSize: 24, fontWeight: FontWeight.Bold, margin: { left: 12 } } })
+        LynxText({ content: 'Key Management', style: { fontSize: 24, fontWeight: FontWeight.Bold, margin: { left: 12 } } })
         LynxBlank({ style: { layoutWeight: 1 } })
       }
 
-      // 表单
-      LynxColumn({ space: 8 }) {
-        LynxText({ content: '导入密钥', style: { fontSize: 18, fontWeight: FontWeight.Medium, margin: { left: 16, right: 16, top: 8 } } })
+      // Form
+      LynxRow() {
+        LynxColumn({ space: 8 }) {
+          LynxText({ content: 'Import key', style: { fontSize: 18, fontWeight: FontWeight.Medium, margin: { left: 16, right: 16, top: 8 } } })
 
-        LynxTextInput({ placeholder: '密钥名称', text: this.keyName, onChange: (v: string): void => { this.keyName = v } })
-        LynxTextArea({ placeholder: '粘贴私钥(PEM)', text: this.keyContent, onChange: (v: string): void => { this.keyContent = v } })
-        LynxTextArea({ placeholder: '粘贴公钥(可选)', text: this.keyPublic, onChange: (v: string): void => { this.keyPublic = v } })
-        LynxTextInput({ placeholder: '口令(可选)', text: this.keyPassphrase, type: InputType.Password, onChange: (v: string): void => { this.keyPassphrase = v } })
+          LynxTextInput({ placeholder: 'Key name', text: this.keyName, onChange: (v: string): void => { this.keyName = v } })
+          LynxTextArea({ placeholder: 'Paste private key (PEM)', text: this.keyContent, onChange: (v: string): void => { this.keyContent = v } })
+          LynxTextArea({ placeholder: 'Paste public key (optional)', text: this.keyPublic, onChange: (v: string): void => { this.keyPublic = v } })
+          LynxTextInput({ placeholder: 'Passphrase (optional)', text: this.keyPassphrase, type: InputType.Password, onChange: (v: string): void => { this.keyPassphrase = v } })
 
-        LynxRow({ style: { padding: { left: 16, right: 16 } } }) {
-          LynxBlank({ style: { layoutWeight: 1 } })
-          LynxButton({
-            label: '保存密钥',
-            style: { height: 44, backgroundColor: '#222222', fontColor: Color.White, borderRadius: 12 },
-            onClick: (): void => {
-              if (!this.keyName || !this.keyContent) { promptAction.showToast({ message: '请填写名称和私钥' }); return; }
-              KeyStore.importKey(this.keyName, this.keyContent, this.keyPublic, this.keyPassphrase);
-              this.keyName = ''; this.keyContent = ''; this.keyPublic = ''; this.keyPassphrase = '';
-              promptAction.showToast({ message: '密钥已保存' });
-            }
-          })
+          LynxRow({ style: { padding: { left: 16, right: 16 } } }) {
+            LynxBlank({ style: { layoutWeight: 1 } })
+            LynxButton({
+              label: 'Save key',
+              style: { height: 44, backgroundColor: '#222222', fontColor: Color.White, borderRadius: 12 },
+              onClick: (): void => {
+                if (!this.keyName || !this.keyContent) {
+                  promptAction.showToast({ message: 'Please fill name and private key' });
+                  return;
+                }
+                KeyStore.importKey(this.keyName, this.keyContent, this.keyPublic, this.keyPassphrase);
+                this.keyName = '';
+                this.keyContent = '';
+                this.keyPublic = '';
+                this.keyPassphrase = '';
+                promptAction.showToast({ message: 'Saved' });
+              }
+            })
+          }
         }
+        .layoutWeight(1)
       }
 
-      // 列表
+      // List
       if (KeyStore.list().length > 0) {
         LynxList({ divider: { strokeWidth: 1, color: '#11000000' }, edgeEffect: EdgeEffect.None }) {
           ForEach(KeyStore.list(), (k: ImportedKey) => {
@@ -58,12 +66,12 @@ export default struct SettingsKeys {
                 LynxColumn({ space: 4 }) {
                   LynxText({ content: k.name, style: { fontSize: 14 } })
                   if (k.fingerprint) {
-                    LynxText({ content: `指纹: ${k.fingerprint.slice(0, 32)}…`, style: { fontSize: 10, fontColor: Color.Grey } })
+                    LynxText({ content: `Fingerprint: ${k.fingerprint.slice(0, 32)}…`, style: { fontSize: 10, fontColor: Color.Grey } })
                   }
                 }
                 LynxBlank({ style: { layoutWeight: 1 } })
                 LynxButton({
-                  label: '删除',
+                  label: 'Delete',
                   style: { height: 32, backgroundColor: '#0F000000', borderRadius: 8 },
                   onClick: (): void => { KeyStore.remove(k.id); }
                 })
@@ -72,7 +80,7 @@ export default struct SettingsKeys {
           }, (k: ImportedKey) => k.id.toString())
         }
       } else {
-        LynxText({ content: '暂无密钥', style: { fontSize: 12, fontColor: Color.Grey, margin: { left: 16, right: 16, top: 16 } } })
+        LynxText({ content: 'No keys yet', style: { fontSize: 12, fontColor: Color.Grey, margin: { left: 16, right: 16, top: 16 } } })
       }
     }
   }

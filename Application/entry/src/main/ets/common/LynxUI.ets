@@ -3,13 +3,13 @@ export interface LynxStyle {
   height?: string | number;
   padding?: Padding | number | string;
   margin?: Margin | number | string;
-  backgroundColor?: ResourceColor;
+  backgroundColor?: string | Color;
   borderRadius?: number | string;
   layoutWeight?: number;
-  justifyContent?: HorizontalAlign | VerticalAlign | FlexAlign;
-  alignItems?: HorizontalAlign | VerticalAlign | ItemAlign;
+  justifyContent?: FlexAlign;
+  alignItems?: ItemAlign | HorizontalAlign | VerticalAlign;
   opacity?: number;
-  borderColor?: ResourceColor;
+  borderColor?: string | Color;
   borderWidth?: number;
 }
 
@@ -20,9 +20,9 @@ export interface LynxContainerProps {
 }
 
 @Builder
-export function LynxColumn(props: LynxContainerProps = {}, content?: () => void) {
+export function LynxColumn(props: LynxContainerProps = {}, content: () => void) {
   Column({ space: props.space ?? 0 }) {
-    if (content) { content(); }
+    content();
   }
   .width(props.style?.width)
   .height(props.style?.height)
@@ -31,7 +31,7 @@ export function LynxColumn(props: LynxContainerProps = {}, content?: () => void)
   .backgroundColor(props.style?.backgroundColor)
   .borderRadius(props.style?.borderRadius as number)
   .layoutWeight(props.style?.layoutWeight)
-  .justifyContent(props.style?.justifyContent as VerticalAlign)
+  .justifyContent(props.style?.justifyContent as FlexAlign)
   .alignItems(props.style?.alignItems as HorizontalAlign)
   .opacity(props.style?.opacity)
   .borderColor(props.style?.borderColor)
@@ -40,9 +40,9 @@ export function LynxColumn(props: LynxContainerProps = {}, content?: () => void)
 }
 
 @Builder
-export function LynxRow(props: LynxContainerProps = {}, content?: () => void) {
+export function LynxRow(props: LynxContainerProps = {}, content: () => void) {
   Row({ space: props.space ?? 0 }) {
-    if (content) { content(); }
+    content();
   }
   .width(props.style?.width)
   .height(props.style?.height)
@@ -51,7 +51,7 @@ export function LynxRow(props: LynxContainerProps = {}, content?: () => void) {
   .backgroundColor(props.style?.backgroundColor)
   .borderRadius(props.style?.borderRadius as number)
   .layoutWeight(props.style?.layoutWeight)
-  .justifyContent(props.style?.justifyContent as HorizontalAlign)
+  .justifyContent(props.style?.justifyContent as FlexAlign)
   .alignItems(props.style?.alignItems as VerticalAlign)
   .opacity(props.style?.opacity)
   .borderColor(props.style?.borderColor)
@@ -64,9 +64,9 @@ export interface LynxScrollProps extends LynxContainerProps {
 }
 
 @Builder
-export function LynxScroll(props: LynxScrollProps = {}, content?: () => void) {
+export function LynxScroll(props: LynxScrollProps = {}, content: () => void) {
   Scroll() {
-    if (content) { content(); }
+    content();
   }
   .scrollBar(props.scrollBar ?? BarState.Off)
   .width(props.style?.width)
@@ -85,7 +85,7 @@ export function LynxScroll(props: LynxScrollProps = {}, content?: () => void) {
 export interface LynxTextStyle extends LynxStyle {
   fontSize?: number | string;
   fontWeight?: FontWeight;
-  fontColor?: ResourceColor;
+  fontColor?: string | Color;
   textAlign?: TextAlign;
   maxLines?: number;
   textOverflow?: TextOverflowOptions;
@@ -118,7 +118,7 @@ export function LynxText(props: LynxTextProps) {
 }
 
 export interface LynxButtonStyle extends LynxStyle {
-  fontColor?: ResourceColor;
+  fontColor?: string | Color;
   type?: ButtonType;
   textSize?: number | string;
 }
@@ -229,43 +229,6 @@ export function LynxToggle(props: LynxToggleProps) {
     .borderWidth(props.style?.borderWidth);
 }
 
-export interface LynxTabItem {
-  title: string;
-  builder: () => void;
-}
-
-export interface LynxTabsProps {
-  index: number;
-  items: Array<LynxTabItem>;
-  style?: LynxStyle;
-  barMode?: BarMode;
-  barPosition?: BarPosition;
-  onChange?: (index: number) => void;
-}
-
-@Builder
-export function LynxTabs(props: LynxTabsProps) {
-  Tabs({ index: props.index }) {
-    ForEach(props.items, (item: LynxTabItem, idx: number) => {
-      TabContent() { item.builder(); }
-        .tabBar({ text: item.title });
-    }, (item: LynxTabItem, idx: number) => idx.toString());
-  }
-  .barMode(props.barMode ?? BarMode.Fixed)
-  .barPosition(props.barPosition ?? BarPosition.End)
-  .onChange(props.onChange ?? undefined)
-  .width(props.style?.width)
-  .height(props.style?.height)
-  .padding(props.style?.padding as Padding)
-  .margin(props.style?.margin as Margin)
-  .backgroundColor(props.style?.backgroundColor)
-  .borderRadius(props.style?.borderRadius as number)
-  .layoutWeight(props.style?.layoutWeight)
-  .opacity(props.style?.opacity)
-  .borderColor(props.style?.borderColor)
-  .borderWidth(props.style?.borderWidth);
-}
-
 export interface LynxListProps {
   style?: LynxStyle;
   divider?: ListDividerOptions;
@@ -274,8 +237,8 @@ export interface LynxListProps {
 }
 
 @Builder
-export function LynxList(props: LynxListProps = {}, content?: () => void) {
-  List() { if (content) { content(); } }
+export function LynxList(props: LynxListProps = {}, content: () => void) {
+  List() { content(); }
     .divider(props.divider)
     .edgeEffect(props.edgeEffect)
     .width(props.style?.width)
@@ -294,8 +257,8 @@ export function LynxList(props: LynxListProps = {}, content?: () => void) {
 export interface LynxListItemProps extends LynxContainerProps {}
 
 @Builder
-export function LynxListItem(props: LynxListItemProps = {}, content?: () => void) {
-  ListItem() { if (content) { content(); } }
+export function LynxListItem(props: LynxListItemProps = {}, content: () => void) {
+  ListItem() { content(); }
     .width(props.style?.width)
     .height(props.style?.height)
     .padding(props.style?.padding as Padding)
@@ -312,9 +275,9 @@ export function LynxListItem(props: LynxListItemProps = {}, content?: () => void
 export interface LynxFlexProps extends LynxContainerProps { align?: Alignment; }
 
 @Builder
-export function LynxFlex(props: LynxFlexProps = {}, content?: () => void) {
+export function LynxFlex(props: LynxFlexProps = {}, content: () => void) {
   Flex({ alignItems: props.style?.alignItems as ItemAlign, justifyContent: props.style?.justifyContent as FlexAlign }) {
-    if (content) { content(); }
+    content();
   }
   .width(props.style?.width)
   .height(props.style?.height)

@@ -33,15 +33,15 @@ export default struct HistoryPage {
     LynxRow({ space: 12, style: { width: '100%', justifyContent: FlexAlign.SpaceBetween } }) {
       ForEach(this.quickActions, (icon: string, index: number) => {
         LynxColumn({
-            style: {
-              width: 64,
-              height: 64,
-              borderRadius: 18,
-              backgroundColor: this.palette.card,
-              justifyContent: FlexAlign.Center,
-              alignItems: ItemAlign.Center
-            }
-          }) {
+          style: {
+            width: 64,
+            height: 64,
+            borderRadius: 18,
+            backgroundColor: this.palette.card,
+            justifyContent: FlexAlign.Center,
+            alignItems: ItemAlign.Center
+          }
+        }) {
             LynxText({ content: icon, style: { fontSize: 20, fontColor: this.palette.primaryText } })
           }
       }, (icon: string, index: number) => index.toString())
@@ -73,7 +73,7 @@ export default struct HistoryPage {
             }
           })
         }
-        LynxText({ content: '›', style: { fontSize: 18, fontColor: this.palette.secondaryText } })
+        LynxText({ content: 'тА?', style: { fontSize: 18, fontColor: this.palette.secondaryText } })
       }
     }
   }

@@ -1,7 +1,7 @@
 import { ConnectionStore } from '../common/Stores';
-import { SSHEngine } from '../common/NativeSSH';
+import { SSHEngine } from '../common/SSHEngine';
 import { router } from '@kit.ArkUI';
-import { LynxBlank, LynxButton, LynxColumn, LynxRow, LynxScroll, LynxText, LynxTextInput } from '../common/LynxUI';
+import { LynxBlank, LynxButton, LynxRow, LynxScroll, LynxText, LynxTextInput } from '../common/LynxUI';
 import { getLynxPalette, LynxPalette } from '../common/LynxTheme';
 import { SettingsStore } from '../common/Stores';
 
@@ -20,7 +20,7 @@ export default struct Terminal {
     const d = ConnectionStore.currentDraft;
     if (d) {
       this.lines = [
-        `已连接到 ${d.username}@${d.host}:${d.port}`
+        `å·²è¿žæŽ¥åˆ° ${d.username}@${d.host}:${d.port}`
       ];
       const port = parseInt(d.port || '22');
       if (d.privateKey) {
@@ -29,19 +29,19 @@ export default struct Terminal {
         this.sessionId = SSHEngine.openSessionPassword(d.host, port, d.username, d.password || '');
       }
       // 轮询读取输出
-        if (this.sessionId > 0) {
-          const tid = setInterval(() => {
-            const chunk: string = SSHEngine.termRead(this.sessionId);
-            if (chunk && chunk.length > 0) {
-              this.lines.push(chunk);
-            }
+      if (this.sessionId > 0) {
+        const tid = setInterval(() => {
+          const chunk: string = SSHEngine.termRead(this.sessionId);
+          if (chunk && chunk.length > 0) {
+            this.lines.push(chunk);
+          }
         }, 150) as number;
         this.timerId = tid;
       } else {
-        this.lines.push('打开终端会话失败');
+        this.lines.push('æ‰“å¼€ç»ˆç«¯ä¼šè¯å¤±è´¥');
       }
     } else {
-      this.lines = [ '未找到连接信息' ];
+      this.lines = [ 'æœªæ‰¾åˆ°è¿žæŽ¥ä¿¡æ?' ];
     }
   }
 
@@ -65,8 +65,8 @@ export default struct Terminal {
   }
 
   build() {
-    LynxColumn({ style: { width: '100%', height: '100%', backgroundColor: this.palette.pageBackground } }) {
-      // 顶部标题栏（返回）
+    Column() {
+      // 顶部（返回）
       LynxBlank({ style: { height: 36, width: '100%' } })
       LynxRow({ style: { height: 56, width: '100%', padding: { left: 16, right: 16 } } }) {
         LynxButton({
@@ -74,29 +74,34 @@ export default struct Terminal {
           style: { height: 36, width: 36, backgroundColor: this.palette.card, borderRadius: 18 },
           onClick: (): void => router.back(),
         })
-        LynxText({ content: '终端', style: { fontSize: 24, fontWeight: FontWeight.Bold, margin: { left: 12 }, fontColor: this.palette.primaryText } })
+        LynxText({ content: 'ç»ˆç«¯', style: { fontSize: 24, fontWeight: FontWeight.Bold, margin: { left: 12 }, fontColor: this.palette.primaryText } })
         LynxBlank({ style: { layoutWeight: 1 } })
       }
 
       // 输出区
       LynxScroll({ style: { layoutWeight: 1 }, scrollBar: BarState.Off }) {
-        LynxColumn({ space: 4, style: { padding: { left: 16, right: 16, top: 8, bottom: 8 }, width: '100%' } }) {
+        Column({ space: 4 }) {
           ForEach(this.lines, (line: string, idx: number) => {
             LynxText({ content: line, style: { fontSize: 13, fontColor: this.palette.primaryText } })
           }, (line: string, idx: number) => idx.toString())
         }
+        .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+        .width('100%')
       }
 
       // 输入区
       LynxRow({ style: { padding: { left: 16, right: 16, top: 8, bottom: 16 }, width: '100%' } }) {
-        LynxTextInput({ placeholder: '输入命令', text: this.cmd, style: { layoutWeight: 1, backgroundColor: this.palette.surface, borderRadius: 12 } , onChange: (v: string): void => { this.cmd = v } })
+        LynxTextInput({ placeholder: 'è¾“å…¥å‘½ä»¤', text: this.cmd, style: { layoutWeight: 1, backgroundColor: this.palette.surface, borderRadius: 12 } , onChange: (v: string): void => { this.cmd = v } })
         LynxBlank({ style: { width: 12 } })
         LynxButton({
-          label: '执行',
+          label: 'æ‰§è¡Œ',
           style: { height: 40, backgroundColor: this.palette.accent, fontColor: Color.White, borderRadius: 12 },
           onClick: (): void => { this.run(); }
         })
       }
     }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.palette.pageBackground);
   }
 }
