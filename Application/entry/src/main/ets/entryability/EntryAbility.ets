@@ -1,6 +1,7 @@
 import { ConfigurationConstant, UIAbility } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
+import { SettingsStore } from '../common/Stores';
 
 const HILOG_DOMAIN = 0x0000;
 const TAG = '[EntryAbility]';
@@ -8,6 +9,7 @@ const TAG = '[EntryAbility]';
 export default class EntryAbility extends UIAbility {
   onCreate() {
     try {
+      SettingsStore.ensureInitialized();
       this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
     } catch (err) {
       hilog.error(HILOG_DOMAIN, TAG, 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
