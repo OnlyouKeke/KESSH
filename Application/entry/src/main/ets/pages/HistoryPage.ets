@@ -1,4 +1,6 @@
 import { LynxBlank, LynxColumn, LynxRow, LynxScroll, LynxText } from '../common/LynxUI';
+import { getLynxPalette, LynxPalette } from '../common/LynxTheme';
+import { SettingsStore } from '../common/Stores';
 
 interface VaultItem {
   key: string;
@@ -11,6 +13,8 @@ interface VaultItem {
 @Entry
 @Component
 export default struct HistoryPage {
+  @StorageLink(SettingsStore.DARK_MODE_KEY) darkMode: boolean = SettingsStore.darkMode;
+
   private quickActions: Array<string> = ['\ud83d\udcc2', '\ud83d\udee1', '\ud83d\udd14'];
 
   private vaultItems: Array<VaultItem> = [
@@ -22,6 +26,8 @@ export default struct HistoryPage {
     { key: 'logs', title: 'Logs', subtitle: 'Recent activity and audit trail', icon: '\ud83d\uddc3', badge: '1' },
   ];
 
+  private get palette(): LynxPalette { return getLynxPalette(this.darkMode); }
+
   @Builder
   buildQuickActions() {
     LynxRow({ space: 12, style: { width: '100%', justifyContent: FlexAlign.SpaceBetween } }) {
@@ -31,12 +37,12 @@ export default struct HistoryPage {
               width: 64,
               height: 64,
               borderRadius: 18,
-              backgroundColor: '#1AE7F0F5',
+              backgroundColor: this.palette.card,
               justifyContent: FlexAlign.Center,
               alignItems: ItemAlign.Center
             }
           }) {
-            LynxText({ content: icon, style: { fontSize: 20 } })
+            LynxText({ content: icon, style: { fontSize: 20, fontColor: this.palette.primaryText } })
           }
       }, (icon: string, index: number) => index.toString())
     }
@@ -44,12 +50,12 @@ export default struct HistoryPage {
 
   @Builder
   buildVaultItem(item: VaultItem) {
-    LynxRow({ style: { padding: { left: 16, right: 16, top: 14, bottom: 14 }, backgroundColor: '#10E7F0F5', borderRadius: 18 } }) {
-      LynxText({ content: item.icon, style: { fontSize: 20, margin: { right: 12 } } })
+    LynxRow({ style: { padding: { left: 16, right: 16, top: 14, bottom: 14 }, backgroundColor: this.palette.card, borderRadius: 18 } }) {
+      LynxText({ content: item.icon, style: { fontSize: 20, margin: { right: 12 }, fontColor: this.palette.primaryText } })
 
       LynxColumn({ space: 4 }) {
-        LynxText({ content: item.title, style: { fontSize: 16, fontWeight: FontWeight.Medium } })
-        LynxText({ content: item.subtitle, style: { fontSize: 13, fontColor: Color.Grey } })
+        LynxText({ content: item.title, style: { fontSize: 16, fontWeight: FontWeight.Medium, fontColor: this.palette.primaryText } })
+        LynxText({ content: item.subtitle, style: { fontSize: 13, fontColor: this.palette.secondaryText } })
       }
 
       LynxBlank({ style: { layoutWeight: 1 } })
@@ -61,19 +67,19 @@ export default struct HistoryPage {
             style: {
               fontSize: 12,
               fontColor: '#ffffff',
-              backgroundColor: '#1E7DD6',
+              backgroundColor: this.palette.accent,
               padding: { left: 8, right: 8, top: 4, bottom: 4 },
               borderRadius: 12
             }
           })
         }
-        LynxText({ content: '›', style: { fontSize: 18, fontColor: '#7A7A7A' } })
+        LynxText({ content: '›', style: { fontSize: 18, fontColor: this.palette.secondaryText } })
       }
     }
   }
 
   build() {
-    LynxColumn({ style: { width: '100%', height: '100%', backgroundColor: '#F5F7FA' } }) {
+    LynxColumn({ style: { width: '100%', height: '100%', backgroundColor: this.palette.pageBackground } }) {
       LynxScroll({ style: { width: '100%', height: '100%' }, scrollBar: BarState.Off }) {
         LynxColumn({ space: 16, style: { padding: { left: 16, right: 16, bottom: 20 }, width: '100%' } }) {
           this.buildQuickActions()

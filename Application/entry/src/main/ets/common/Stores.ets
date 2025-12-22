@@ -1,3 +1,4 @@
+import { AppStorage } from '@kit.ArkUI';
 import hilog from '@ohos.hilog';
 import { SecurityUtils } from './SecurityUtils';
 
@@ -55,11 +56,30 @@ export class Logger {
 }
 
 export class SettingsStore {
-  static darkMode: boolean = false;
-  static savePassword: boolean = false;
+  static readonly DARK_MODE_KEY = 'lynx_dark_mode';
+  static readonly SAVE_PASSWORD_KEY = 'lynx_save_password';
 
-  static setDarkMode(v: boolean): void { SettingsStore.darkMode = v; Logger.log(`设置: 深色模式=${v ? '开' : '关'}`); }
-  static setSavePassword(v: boolean): void { SettingsStore.savePassword = v; Logger.log(`设置: 保存密码=${v ? '开' : '关'}`); }
+  static ensureInitialized(): void {
+    if (!AppStorage.has(SettingsStore.DARK_MODE_KEY)) {
+      AppStorage.setOrCreate(SettingsStore.DARK_MODE_KEY, false);
+    }
+    if (!AppStorage.has(SettingsStore.SAVE_PASSWORD_KEY)) {
+      AppStorage.setOrCreate(SettingsStore.SAVE_PASSWORD_KEY, false);
+    }
+  }
+
+  static get darkMode(): boolean { return AppStorage.get<boolean>(SettingsStore.DARK_MODE_KEY) ?? false; }
+  static get savePassword(): boolean { return AppStorage.get<boolean>(SettingsStore.SAVE_PASSWORD_KEY) ?? false; }
+
+  static setDarkMode(v: boolean): void {
+    AppStorage.setOrCreate(SettingsStore.DARK_MODE_KEY, v);
+    Logger.log(`设置: 深色模式=${v ? '开' : '关'}`);
+  }
+
+  static setSavePassword(v: boolean): void {
+    AppStorage.setOrCreate(SettingsStore.SAVE_PASSWORD_KEY, v);
+    Logger.log(`设置: 保存密码=${v ? '开' : '关'}`);
+  }
 }
 
 export class ConnectionStore {

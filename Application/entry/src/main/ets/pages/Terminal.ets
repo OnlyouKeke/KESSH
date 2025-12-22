@@ -2,14 +2,19 @@ import { ConnectionStore } from '../common/Stores';
 import { SSHEngine } from '../common/NativeSSH';
 import { router } from '@kit.ArkUI';
 import { LynxBlank, LynxButton, LynxColumn, LynxRow, LynxScroll, LynxText, LynxTextInput } from '../common/LynxUI';
+import { getLynxPalette, LynxPalette } from '../common/LynxTheme';
+import { SettingsStore } from '../common/Stores';
 
 @Entry
 @Component
 export default struct Terminal {
   @State lines: Array<string> = [];
   @State cmd: string = '';
+  @StorageLink(SettingsStore.DARK_MODE_KEY) darkMode: boolean = SettingsStore.darkMode;
   private sessionId: number = -1;
   private timerId: number = -1;
+
+  private get palette(): LynxPalette { return getLynxPalette(this.darkMode); }
 
   aboutToAppear(): void {
     const d = ConnectionStore.currentDraft;
@@ -60,16 +65,16 @@ export default struct Terminal {
   }
 
   build() {
-    LynxColumn({ style: { width: '100%', height: '100%' } }) {
+    LynxColumn({ style: { width: '100%', height: '100%', backgroundColor: this.palette.pageBackground } }) {
       // 顶部标题栏（返回）
       LynxBlank({ style: { height: 36, width: '100%' } })
       LynxRow({ style: { height: 56, width: '100%', padding: { left: 16, right: 16 } } }) {
         LynxButton({
           label: '<',
-          style: { height: 36, width: 36, backgroundColor: '#0F000000', borderRadius: 18 },
+          style: { height: 36, width: 36, backgroundColor: this.palette.card, borderRadius: 18 },
           onClick: (): void => router.back(),
         })
-        LynxText({ content: '终端', style: { fontSize: 24, fontWeight: FontWeight.Bold, margin: { left: 12 } } })
+        LynxText({ content: '终端', style: { fontSize: 24, fontWeight: FontWeight.Bold, margin: { left: 12 }, fontColor: this.palette.primaryText } })
         LynxBlank({ style: { layoutWeight: 1 } })
       }
 
@@ -77,18 +82,18 @@ export default struct Terminal {
       LynxScroll({ style: { layoutWeight: 1 }, scrollBar: BarState.Off }) {
         LynxColumn({ space: 4, style: { padding: { left: 16, right: 16, top: 8, bottom: 8 }, width: '100%' } }) {
           ForEach(this.lines, (line: string, idx: number) => {
-            LynxText({ content: line, style: { fontSize: 13 } })
+            LynxText({ content: line, style: { fontSize: 13, fontColor: this.palette.primaryText } })
           }, (line: string, idx: number) => idx.toString())
         }
       }
 
       // 输入区
       LynxRow({ style: { padding: { left: 16, right: 16, top: 8, bottom: 16 }, width: '100%' } }) {
-        LynxTextInput({ placeholder: '输入命令', text: this.cmd, style: { layoutWeight: 1 } , onChange: (v: string): void => { this.cmd = v } })
+        LynxTextInput({ placeholder: '输入命令', text: this.cmd, style: { layoutWeight: 1, backgroundColor: this.palette.surface, borderRadius: 12 } , onChange: (v: string): void => { this.cmd = v } })
         LynxBlank({ style: { width: 12 } })
         LynxButton({
           label: '执行',
-          style: { height: 40, backgroundColor: '#222222', fontColor: Color.White, borderRadius: 12 },
+          style: { height: 40, backgroundColor: this.palette.accent, fontColor: Color.White, borderRadius: 12 },
           onClick: (): void => { this.run(); }
         })
       }

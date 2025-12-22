@@ -1,9 +1,14 @@
 import { LynxBlank, LynxButton, LynxRow, LynxText } from '../common/LynxUI';
+import { getLynxPalette, LynxPalette } from '../common/LynxTheme';
+import { SettingsStore } from '../common/Stores';
 
 @Component
 export default struct TitleBar {
   @Prop title: string = '';
   @Prop showActions: boolean = false;
+  @StorageLink(SettingsStore.DARK_MODE_KEY) darkMode: boolean = SettingsStore.darkMode;
+
+  private get palette(): LynxPalette { return getLynxPalette(this.darkMode); }
 
   build() {
     LynxRow({ style: { height: 56, width: '100%' } }) {
@@ -11,7 +16,7 @@ export default struct TitleBar {
       if (this.title && this.title.length > 0) {
         LynxText({
           content: this.title,
-          style: { fontSize: 24, fontWeight: FontWeight.Bold, margin: { left: 16 } }
+          style: { fontSize: 24, fontWeight: FontWeight.Bold, margin: { left: 16 }, fontColor: this.palette.primaryText }
         })
       } else {
         LynxBlank({ style: { width: 16 } })
@@ -25,7 +30,7 @@ export default struct TitleBar {
           style: {
             padding: { left: 12, right: 12 },
             margin: { right: 16 },
-            backgroundColor: '#0F000000',
+            backgroundColor: this.palette.card,
             borderRadius: 18,
             height: 36
           }
