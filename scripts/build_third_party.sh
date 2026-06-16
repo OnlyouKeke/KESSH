@@ -257,4 +257,11 @@ build_libssh2
 echo
 echo "Success!"
 echo "wolfSSL installed to: ${WOLFSSL_OUT}"
+echo "  include: ${WOLFSSL_OUT}/include"
+echo "  library: ${WOLFSSL_OUT}/lib/libwolfssl.a"
 echo "libssh2 installed to: ${LIBSSH2_OUT}"
+echo "  include: ${LIBSSH2_OUT}/include"
+echo "  library: ${LIBSSH2_OUT}/lib/libssh2.a"
+echo
+echo "CMake defaults expect these outputs under the repository root."
+echo "If OUTPUT_ROOT was customized, pass -DWOLFSSL_ROOT=${WOLFSSL_OUT} and -DLIBSSH2_ROOT=${LIBSSH2_OUT}."

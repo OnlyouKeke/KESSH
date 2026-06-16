@@ -1,0 +1,50 @@
+# Logs and diagnostics
+*.log
+error.log
+
+# Local editor / AI assistant state
+.trae/
+.idea/
+.vscode/
+*.iml
+
+# HarmonyOS / Hvigor generated files
+.hvigor/
+Application/.hvigor/
+Application/**/.hvigor/
+Application/**/build/
+Application/**/.preview/
+Application/**/.cxx/
+Application/oh_modules/
+Application/**/oh_modules/
+Application/local.properties
+Application/**/local.properties
+
+# Node.js dependencies and generated output
+node_modules/
+CloudProgram/node_modules/
+CloudProgram/**/node_modules/
+CloudProgram/build/
+
+# Native third-party downloads, build trees, and local install outputs
+third_party/downloads/
+third_party/src/
+third_party/build/
+wolfssl-out/
+libssh2-out/
+mbedtls-out/
+tests/**/build/
+
+# HarmonyOS packages and release artifacts
+*.hap
+*.app
+*.hsp
+*.har
+
+# Signing materials: keep these local or in a secure secret store
+*.p12
+*.p7b
+*.cer
+*.csr
+*.keystore
+*.jks

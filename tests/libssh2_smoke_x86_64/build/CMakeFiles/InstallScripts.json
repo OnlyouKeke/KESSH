@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"E:/KESSH/tests/libssh2_smoke_x86_64/build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
