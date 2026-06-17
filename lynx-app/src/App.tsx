@@ -1,8 +1,9 @@
-import { useEffect, useState } from '@lynx-js/react';
+import { useState } from '@lynx-js/react';
 import type { ReactNode } from '@lynx-js/react';
 import { clsx } from 'clsx';
 
 import { NavigatorProvider, useNavigator } from './navigation/Navigator';
+import { ThemeProvider } from './state/ThemeContext';
 import { KesshHost } from './native/host';
 
 import { HistoryPage } from './pages/HistoryPage';
@@ -176,29 +177,13 @@ function CurrentRoute() {
   }
 }
 
-function ThemedRoot({ children }: { children: ReactNode }) {
-  const [darkMode, setDarkMode] = useState<boolean>(false);
-  useEffect(() => {
-    KesshHost.getSettings()
-      .then((settings) => setDarkMode(settings.darkMode))
-      .catch(() => {
-        /* host not bridged in dev preview */
-      });
-  }, []);
-  return (
-    <view className={clsx('app-root', darkMode ? 'lunaris-dark' : 'luna-light')}>
-      {children}
-    </view>
-  );
-}
-
 export function App() {
   return (
-    <ThemedRoot>
+    <ThemeProvider>
       <NavigatorProvider initial="Home">
         <CurrentRoute />
       </NavigatorProvider>
-    </ThemedRoot>
+    </ThemeProvider>
   );
 }
 

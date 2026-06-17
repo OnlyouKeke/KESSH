@@ -6,6 +6,7 @@ import { useNavigator } from '../navigation/Navigator';
 import type { RouteName } from '../navigation/Navigator';
 import { KesshHost } from '../native/host';
 import type { AppSettings } from '../native/host';
+import { useTheme } from '../state/ThemeContext';
 
 const SUB_PAGES: { key: RouteName; title: string; subtitle: string }[] = [
   { key: 'SettingsKeys', title: '密钥管理', subtitle: '导入和管理 SSH 私钥/公钥' },
@@ -22,6 +23,7 @@ const SUB_PAGES: { key: RouteName; title: string; subtitle: string }[] = [
 
 export function SettingsPage() {
   const navigator = useNavigator();
+  const theme = useTheme();
   const [settings, setSettings] = useState<AppSettings | null>(null);
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function SettingsPage() {
       .then((value) => setSettings(value))
       .catch(() => {
         setSettings({
-          darkMode: false,
+          darkMode: theme.darkMode,
           savePassword: false,
           session: { keepaliveInterval: 60, keepaliveAttempts: 3, terminalFontFamily: 'system', terminalFontSize: 14 }
         });
@@ -56,10 +58,10 @@ export function SettingsPage() {
               <text className="card-subtitle">跟随系统或手动切换</text>
             </view>
             <Switch
-              checked={settings.darkMode}
+              checked={theme.darkMode}
               onChange={(checked) => {
-                setSettings({ ...settings, darkMode: checked });
-                KesshHost.setDarkMode(checked).catch(() => undefined);
+                theme.setDarkMode(checked);
+                setSettings(settings ? { ...settings, darkMode: checked } : settings);
               }}
             />
           </view>
