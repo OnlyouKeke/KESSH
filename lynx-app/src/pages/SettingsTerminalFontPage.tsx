@@ -1,7 +1,8 @@
-import { Input } from '@lynx-js/lynx-ui';
+import { Input, KeyboardAwareTrigger } from '@lynx-js/lynx-ui';
 import { useEffect, useState } from '@lynx-js/react';
 
 import { Card, EmptyState, PageHeader, PrimaryAction } from '../components/Page';
+import { KeyboardAwarePage } from '../components/KeyboardAwarePage';
 import { useFontOptions } from '../native/hooks';
 import { KesshHost } from '../native/host';
 
@@ -48,7 +49,7 @@ export function SettingsTerminalFontPage() {
   const previewFamily = options?.find((option) => option.key === selected)?.family ?? 'monospace';
 
   return (
-    <view className="page">
+    <KeyboardAwarePage>
       <PageHeader title="终端字体" />
 
       <view style={{ padding: 16, gap: 16 }}>
@@ -85,18 +86,20 @@ export function SettingsTerminalFontPage() {
           ))
         )}
 
-        <view className="form-field">
-          <text className="form-field-label">字体大小</text>
-          <Input
-            className="form-field-input"
-            value={size}
-            type="number"
-            placeholder="例如 14"
-            onInput={(value) => setSize(value)}
-          />
-        </view>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">字体大小</text>
+            <Input
+              className="form-field-input"
+              value={size}
+              type="number"
+              placeholder="例如 14"
+              onInput={(value) => setSize(value)}
+            />
+          </view>
+        </KeyboardAwareTrigger>
         <PrimaryAction label={saving ? '保存中…' : '保存大小'} onTap={saveSize} disabled={saving} />
       </view>
-    </view>
+    </KeyboardAwarePage>
   );
 }

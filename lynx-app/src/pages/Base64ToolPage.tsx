@@ -1,7 +1,8 @@
-import { TextArea } from '@lynx-js/lynx-ui';
+import { KeyboardAwareTrigger, TextArea } from '@lynx-js/lynx-ui';
 import { useState } from '@lynx-js/react';
 
 import { Card, PageHeader, PrimaryAction } from '../components/Page';
+import { KeyboardAwarePage } from '../components/KeyboardAwarePage';
 import { KesshHost } from '../native/host';
 
 function timestamp(): string {
@@ -115,7 +116,7 @@ export function Base64ToolPage() {
   }
 
   return (
-    <view className="page">
+    <KeyboardAwarePage>
       <PageHeader title="Base64 编解码" trailing={<PrimaryAction label="清空" onTap={clearAll} />} />
 
       <view style={{ padding: 16, gap: 16 }}>
@@ -124,32 +125,36 @@ export function Base64ToolPage() {
           <text className="card-subtitle">本地完成字符串编解码，所有数据仅在设备上处理</text>
         </Card>
 
-        <view className="form-field">
-          <text className="form-field-label">原文 ({plain.length} 字符)</text>
-          <TextArea
-            className="form-field-input"
-            value={plain}
-            placeholder="输入待编码的文本内容…"
-            onInput={(value) => setPlain(value)}
-          />
-        </view>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">原文 ({plain.length} 字符)</text>
+            <TextArea
+              className="form-field-input"
+              value={plain}
+              placeholder="输入待编码的文本内容…"
+              onInput={(value) => setPlain(value)}
+            />
+          </view>
+        </KeyboardAwareTrigger>
         <PrimaryAction label="编码 →" onTap={encode} />
 
-        <view className="form-field">
-          <text className="form-field-label">Base64 文本 ({encoded.length} 字符)</text>
-          <TextArea
-            className="form-field-input"
-            value={encoded}
-            placeholder="输入待解码的 Base64 文本…"
-            onInput={(value) => setEncoded(value)}
-          />
-        </view>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">Base64 文本 ({encoded.length} 字符)</text>
+            <TextArea
+              className="form-field-input"
+              value={encoded}
+              placeholder="输入待解码的 Base64 文本…"
+              onInput={(value) => setEncoded(value)}
+            />
+          </view>
+        </KeyboardAwareTrigger>
         <PrimaryAction label="← 解码" onTap={decode} />
 
         {status ? (
           <text className="card-subtitle" style={{ textAlign: 'center' }}>{status}</text>
         ) : null}
       </view>
-    </view>
+    </KeyboardAwarePage>
   );
 }

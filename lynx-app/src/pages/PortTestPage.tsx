@@ -1,7 +1,8 @@
-import { Input } from '@lynx-js/lynx-ui';
+import { Input, KeyboardAwareTrigger } from '@lynx-js/lynx-ui';
 import { useState } from '@lynx-js/react';
 
 import { Card, PageHeader, PrimaryAction } from '../components/Page';
+import { KeyboardAwarePage } from '../components/KeyboardAwarePage';
 import { KesshHost } from '../native/host';
 
 function timestamp(): string {
@@ -48,7 +49,7 @@ export function PortTestPage() {
   }
 
   return (
-    <view className="page">
+    <KeyboardAwarePage>
       <PageHeader title="端口测试" />
 
       <view style={{ padding: 16, gap: 16 }}>
@@ -57,35 +58,41 @@ export function PortTestPage() {
           <text className="card-subtitle">验证指定主机的端口是否开放，常用于检测 SSH(22)、HTTP(80)、HTTPS(443) 等服务</text>
         </Card>
 
-        <view className="form-field">
-          <text className="form-field-label">主机或 IP</text>
-          <Input
-            className="form-field-input"
-            value={host}
-            placeholder="主机或 IP 地址"
-            onInput={(value) => setHost(value)}
-          />
-        </view>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">主机或 IP</text>
+            <Input
+              className="form-field-input"
+              value={host}
+              placeholder="主机或 IP 地址"
+              onInput={(value) => setHost(value)}
+            />
+          </view>
+        </KeyboardAwareTrigger>
 
         <view className="form-field-row">
-          <view className="form-field" style={{ flex: 1 }}>
-            <text className="form-field-label">端口号</text>
-            <Input
-              className="form-field-input"
-              value={port}
-              type="number"
-              onInput={(value) => setPort(value)}
-            />
-          </view>
-          <view className="form-field" style={{ flex: 1 }}>
-            <text className="form-field-label">超时 (ms)</text>
-            <Input
-              className="form-field-input"
-              value={timeoutMs}
-              type="number"
-              onInput={(value) => setTimeoutMs(value)}
-            />
-          </view>
+          <KeyboardAwareTrigger>
+            <view className="form-field" style={{ flex: 1 }}>
+              <text className="form-field-label">端口号</text>
+              <Input
+                className="form-field-input"
+                value={port}
+                type="number"
+                onInput={(value) => setPort(value)}
+              />
+            </view>
+          </KeyboardAwareTrigger>
+          <KeyboardAwareTrigger>
+            <view className="form-field" style={{ flex: 1 }}>
+              <text className="form-field-label">超时 (ms)</text>
+              <Input
+                className="form-field-input"
+                value={timeoutMs}
+                type="number"
+                onInput={(value) => setTimeoutMs(value)}
+              />
+            </view>
+          </KeyboardAwareTrigger>
         </view>
 
         <PrimaryAction
@@ -112,6 +119,6 @@ export function PortTestPage() {
           </Card>
         ) : null}
       </view>
-    </view>
+    </KeyboardAwarePage>
   );
 }

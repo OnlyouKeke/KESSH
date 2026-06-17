@@ -1,7 +1,8 @@
 import { useState } from '@lynx-js/react';
-import { Input } from '@lynx-js/lynx-ui';
+import { Input, KeyboardAwareTrigger } from '@lynx-js/lynx-ui';
 
 import { Card, EmptyState, PageHeader, PrimaryAction } from '../components/Page';
+import { KeyboardAwarePage } from '../components/KeyboardAwarePage';
 import { useSnippets } from '../native/hooks';
 import { KesshHost } from '../native/host';
 
@@ -30,18 +31,22 @@ export function SnippetsPage() {
   }
 
   return (
-    <view className="page">
+    <KeyboardAwarePage>
       <PageHeader title="代码片段" />
 
       <view style={{ padding: 16, gap: 12 }}>
-        <view className="form-field">
-          <text className="form-field-label">标题</text>
-          <Input className="form-field-input" value={title} onInput={(value) => setTitle(value)} />
-        </view>
-        <view className="form-field">
-          <text className="form-field-label">命令</text>
-          <Input className="form-field-input" value={command} onInput={(value) => setCommand(value)} />
-        </view>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">标题</text>
+            <Input className="form-field-input" value={title} onInput={(value) => setTitle(value)} />
+          </view>
+        </KeyboardAwareTrigger>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">命令</text>
+            <Input className="form-field-input" value={command} onInput={(value) => setCommand(value)} />
+          </view>
+        </KeyboardAwareTrigger>
         <PrimaryAction label="添加片段" onTap={add} />
       </view>
 
@@ -62,6 +67,6 @@ export function SnippetsPage() {
           ))}
         </view>
       )}
-    </view>
+    </KeyboardAwarePage>
   );
 }

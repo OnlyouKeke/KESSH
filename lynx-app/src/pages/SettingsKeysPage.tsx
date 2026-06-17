@@ -1,7 +1,8 @@
-import { Input, TextArea } from '@lynx-js/lynx-ui';
+import { Input, KeyboardAwareTrigger, TextArea } from '@lynx-js/lynx-ui';
 import { useState } from '@lynx-js/react';
 
 import { Card, EmptyState, PageHeader, PrimaryAction } from '../components/Page';
+import { KeyboardAwarePage } from '../components/KeyboardAwarePage';
 import { useKeys } from '../native/hooks';
 import { KesshHost } from '../native/host';
 
@@ -37,27 +38,35 @@ export function SettingsKeysPage() {
   }
 
   return (
-    <view className="page">
+    <KeyboardAwarePage>
       <PageHeader title="密钥管理" />
 
       <view style={{ padding: 16, gap: 12 }}>
         <text className="section-title" style={{ padding: 0 }}>导入密钥</text>
-        <view className="form-field">
-          <text className="form-field-label">密钥名称</text>
-          <Input className="form-field-input" value={name} onInput={(value) => setName(value)} />
-        </view>
-        <view className="form-field">
-          <text className="form-field-label">私钥 (PEM)</text>
-          <TextArea className="form-field-input" value={content} onInput={(value) => setContent(value)} />
-        </view>
-        <view className="form-field">
-          <text className="form-field-label">公钥（可选）</text>
-          <TextArea className="form-field-input" value={publicKey} onInput={(value) => setPublicKey(value)} />
-        </view>
-        <view className="form-field">
-          <text className="form-field-label">密码短语（可选）</text>
-          <Input className="form-field-input" value={passphrase} type="password" onInput={(value) => setPassphrase(value)} />
-        </view>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">密钥名称</text>
+            <Input className="form-field-input" value={name} onInput={(value) => setName(value)} />
+          </view>
+        </KeyboardAwareTrigger>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">私钥 (PEM)</text>
+            <TextArea className="form-field-input" value={content} onInput={(value) => setContent(value)} />
+          </view>
+        </KeyboardAwareTrigger>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">公钥（可选）</text>
+            <TextArea className="form-field-input" value={publicKey} onInput={(value) => setPublicKey(value)} />
+          </view>
+        </KeyboardAwareTrigger>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">密码短语（可选）</text>
+            <Input className="form-field-input" value={passphrase} type="password" onInput={(value) => setPassphrase(value)} />
+          </view>
+        </KeyboardAwareTrigger>
         <PrimaryAction label="保存密钥" onTap={importKey} />
       </view>
 
@@ -85,6 +94,6 @@ export function SettingsKeysPage() {
           ))}
         </view>
       )}
-    </view>
+    </KeyboardAwarePage>
   );
 }

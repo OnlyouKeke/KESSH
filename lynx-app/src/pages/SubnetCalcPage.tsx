@@ -1,7 +1,8 @@
-import { Input } from '@lynx-js/lynx-ui';
+import { Input, KeyboardAwareTrigger } from '@lynx-js/lynx-ui';
 import { useState } from '@lynx-js/react';
 
 import { Card, PageHeader, PrimaryAction } from '../components/Page';
+import { KeyboardAwarePage } from '../components/KeyboardAwarePage';
 import { KesshHost } from '../native/host';
 
 interface SubnetResult {
@@ -107,7 +108,7 @@ export function SubnetCalcPage() {
   }
 
   return (
-    <view className="page">
+    <KeyboardAwarePage>
       <PageHeader title="子网掩码计算器" />
 
       <view style={{ padding: 16, gap: 16 }}>
@@ -116,15 +117,19 @@ export function SubnetCalcPage() {
           <text className="card-subtitle">根据 IP 地址和子网掩码位数自动计算网络/广播地址、主机范围等信息</text>
         </Card>
 
-        <view className="form-field">
-          <text className="form-field-label">IP 地址</text>
-          <Input className="form-field-input" value={ip} placeholder="例如 192.168.1.100" onInput={(value) => setIp(value)} />
-        </view>
-        <view className="form-field-row">
-          <view className="form-field" style={{ flex: 1 }}>
-            <text className="form-field-label">掩码位数 (0-32)</text>
-            <Input className="form-field-input" value={maskText} type="number" onInput={(value) => setMaskText(value)} />
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">IP 地址</text>
+            <Input className="form-field-input" value={ip} placeholder="例如 192.168.1.100" onInput={(value) => setIp(value)} />
           </view>
+        </KeyboardAwareTrigger>
+        <view className="form-field-row">
+          <KeyboardAwareTrigger>
+            <view className="form-field" style={{ flex: 1 }}>
+              <text className="form-field-label">掩码位数 (0-32)</text>
+              <Input className="form-field-input" value={maskText} type="number" onInput={(value) => setMaskText(value)} />
+            </view>
+          </KeyboardAwareTrigger>
           <PrimaryAction label="开始计算" onTap={run} />
         </view>
 
@@ -150,6 +155,6 @@ export function SubnetCalcPage() {
           </Card>
         ) : null}
       </view>
-    </view>
+    </KeyboardAwarePage>
   );
 }

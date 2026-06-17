@@ -1,7 +1,8 @@
-import { Input } from '@lynx-js/lynx-ui';
+import { Input, KeyboardAwareTrigger } from '@lynx-js/lynx-ui';
 import { useState } from '@lynx-js/react';
 
 import { Card, PageHeader, PrimaryAction } from '../components/Page';
+import { KeyboardAwarePage } from '../components/KeyboardAwarePage';
 import { KesshHost } from '../native/host';
 
 function timestamp(): string {
@@ -46,7 +47,7 @@ export function PingToolPage() {
   }
 
   return (
-    <view className="page">
+    <KeyboardAwarePage>
       <PageHeader title="Ping 工具" />
 
       <view style={{ padding: 16, gap: 16 }}>
@@ -55,26 +56,30 @@ export function PingToolPage() {
           <text className="card-subtitle">快速测试到指定主机的网络延迟和连通性，支持域名和 IP 地址</text>
         </Card>
 
-        <view className="form-field">
-          <text className="form-field-label">主机或 IP</text>
-          <Input
-            className="form-field-input"
-            value={host}
-            placeholder="例如 baidu.com"
-            onInput={(value) => setHost(value)}
-          />
-        </view>
-
-        <view className="form-field-row">
-          <view className="form-field" style={{ flex: 1 }}>
-            <text className="form-field-label">次数 (1-10)</text>
+        <KeyboardAwareTrigger>
+          <view className="form-field">
+            <text className="form-field-label">主机或 IP</text>
             <Input
               className="form-field-input"
-              value={count}
-              type="number"
-              onInput={(value) => setCount(value)}
+              value={host}
+              placeholder="例如 baidu.com"
+              onInput={(value) => setHost(value)}
             />
           </view>
+        </KeyboardAwareTrigger>
+
+        <view className="form-field-row">
+          <KeyboardAwareTrigger>
+            <view className="form-field" style={{ flex: 1 }}>
+              <text className="form-field-label">次数 (1-10)</text>
+              <Input
+                className="form-field-input"
+                value={count}
+                type="number"
+                onInput={(value) => setCount(value)}
+              />
+            </view>
+          </KeyboardAwareTrigger>
           <PrimaryAction
             label={loading ? '测试中…' : '开始 Ping'}
             onTap={run}
@@ -94,6 +99,6 @@ export function PingToolPage() {
           </Card>
         ) : null}
       </view>
-    </view>
+    </KeyboardAwarePage>
   );
 }
