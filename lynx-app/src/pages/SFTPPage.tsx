@@ -1,4 +1,3 @@
-import { Sheet } from '@lynx-js/lynx-ui';
 import { useEffect, useRef, useState } from '@lynx-js/react';
 
 import { Card, EmptyState, PageHeader, PrimaryAction } from '../components/Page';

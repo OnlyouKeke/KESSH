@@ -188,26 +188,32 @@ export class KesshHost {
   // --------------------------------------------------------------------- keys
 
   async listKeys(): Promise<ImportedKey[]> {
-    return KeyStore.list().map((key: ImportedKey): ImportedKey => ({
-      id: key.id,
-      name: key.name,
-      content: '',
-      publicKey: key.publicKey,
-      passphrase: undefined,
-      fingerprint: key.fingerprint
-    }));
+    return KeyStore.list().map((key: ImportedKey): ImportedKey => {
+      const safe: ImportedKey = {
+        id: key.id,
+        name: key.name,
+        content: '',
+        fingerprint: key.fingerprint
+      };
+      if (key.publicKey) {
+        safe.publicKey = key.publicKey;
+      }
+      return safe;
+    });
   }
 
   async importKey(name: string, content: string, publicKey?: string, passphrase?: string): Promise<ImportedKey> {
     const key = KeyStore.importKey(name, content, publicKey, passphrase);
-    return {
+    const safe: ImportedKey = {
       id: key.id,
       name: key.name,
       content: '',
-      publicKey: key.publicKey,
-      passphrase: undefined,
       fingerprint: key.fingerprint
     };
+    if (key.publicKey) {
+      safe.publicKey = key.publicKey;
+    }
+    return safe;
   }
 
   async removeKey(id: number): Promise<void> {
