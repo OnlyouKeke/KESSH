@@ -1,6 +1,7 @@
 {
   "src": [
     "pages/Index",
+    "pages/LynxHostPage",
     "pages/Terminal",
     "pages/SSHNewPage",
     "pages/SCPPage",

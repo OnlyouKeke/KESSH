@@ -7,10 +7,12 @@ KESSH is a HarmonyOS Stage application for SSH-related workflows. The repository
 - `Application/` — HarmonyOS Stage main project. Open this directory in DevEco Studio.
 - `Application/entry/` — main HAP module, including ArkTS UI code and the C++ NAPI module.
 - `Application/cloud_objects/` — HAR module for cloud object interfaces.
+- `lynx-app/` — ReactLynx UI (Rspeedy + `@lynx-js/lynx-ui`) that is progressively replacing the ArkTS pages. Built into a `.lynx.bundle` and rendered inside HarmonyOS via `LynxView` from `@lynx/lynx@next`. See `lynx-app/README.md`.
 - `CloudProgram/` — cloud-side Node/TypeScript project.
 - `scripts/` — engineering scripts. `build_third_party.sh` builds native SSH dependencies.
 - `docs/` — build and engineering documentation.
 - `tests/` — local WebSocket and native smoke-test utilities.
+- `.agents/skills/` — installed AI skills (`lynx-ui`, `reactlynx-best-practices`, `lynx-typescript`, ...). Installed via `npx skills add lynx-community/skills`.
 
 Generated output, dependency installs, logs, signing materials, and local build caches should stay out of version control. Recreate them from the scripts and lock files when needed.
 

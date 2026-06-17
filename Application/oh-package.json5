@@ -2,12 +2,12 @@
   "modelVersion": "6.0.0",
   "description": "Please describe the basic information.",
   "dependencies": {
-    "@lynx/lynx": "3.4.1",
-    "@lynx/lynx_devtool": "3.4.1",
-    "@lynx/lynx_devtool_service": "3.4.1",
-    "@lynx/lynx_http_service": "3.4.1",
-    "@lynx/lynx_log_service": "3.4.1",
-    "@lynx/primjs": "2.14.1"
+    "@lynx/lynx": "next",
+    "@lynx/lynx_devtool": "next",
+    "@lynx/lynx_devtool_service": "next",
+    "@lynx/lynx_http_service": "next",
+    "@lynx/lynx_log_service": "next",
+    "@lynx/primjs": "next"
   },
   "devDependencies": {
     "@ohos/hypium": "1.0.24",

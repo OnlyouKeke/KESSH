@@ -50,6 +50,14 @@ export default struct SettingsPage {
         }
 
         // 子页面入口
+        LynxListItem({ style: { width: '100%', height: 56, padding: { left: 16, right: 16 } }, onTap: (): void => { router.pushUrl({ url: 'pages/LynxHostPage' }) } }) {
+          LynxRow() {
+            LynxText({ content: '使用 Lynx UI（实验）', style: { fontSize: 16 } })
+            LynxBlank({ style: { layoutWeight: 1 } })
+            LynxText({ content: '>', style: { fontColor: '#66000000' } })
+          }
+        }
+
         LynxListItem({ style: { width: '100%', height: 56, padding: { left: 16, right: 16 } }, onTap: (): void => { router.pushUrl({ url: 'pages/SettingsKeys' }) } }) {
           LynxRow() {
             LynxText({ content: '密钥管理', style: { fontSize: 16 } })

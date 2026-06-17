@@ -35,6 +35,15 @@ libssh2-out/
 mbedtls-out/
 tests/**/build/
 
+# Lynx UI subproject build output
+lynx-app/node_modules/
+lynx-app/dist/
+lynx-app/.rspeedy/
+lynx-app/.cache/
+
+# Installed AI skills (synced via `npx skills add lynx-community/skills`)
+.agents/
+
 # HarmonyOS packages and release artifacts
 *.hap
 *.app

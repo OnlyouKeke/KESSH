@@ -1,0 +1,26 @@
+{
+  "name": "kessh-lynx-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ReactLynx UI for KESSH, rendered inside HarmonyOS via @lynx/lynx LynxView. Built with Rspeedy and @lynx-js/lynx-ui.",
+  "type": "module",
+  "scripts": {
+    "dev": "rspeedy dev",
+    "build": "rspeedy build",
+    "preview": "rspeedy preview"
+  },
+  "dependencies": {
+    "@lynx-js/react": "^0.114.0",
+    "@lynx-js/lynx-ui": "^0.6.0",
+    "@lynx-js/luna-styles": "^0.6.0",
+    "clsx": "^2.1.1"
+  },
+  "devDependencies": {
+    "@lynx-js/qrcode-rsbuild-plugin": "^0.4.0",
+    "@lynx-js/react-rsbuild-plugin": "^0.10.0",
+    "@lynx-js/rspeedy": "^0.10.0",
+    "@lynx-js/types": "^3.4.0",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.6.0"
+  }
+}
