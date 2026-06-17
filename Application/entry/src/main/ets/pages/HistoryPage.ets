@@ -1,6 +1,8 @@
 import { LynxBlank, LynxColumn, LynxRow, LynxScroll, LynxText } from '../common/LynxUI';
 import { getLynxPalette, LynxPalette } from '../common/LynxTheme';
 import { SettingsStore } from '../common/Stores';
+import { ConnectionStore, ConnectionRecord } from '../common/Stores';
+import { promptAction, router } from '@kit.ArkUI';
 
 interface VaultItem {
   key: string;
@@ -14,19 +16,49 @@ interface VaultItem {
 @Component
 export default struct HistoryPage {
   @StorageLink(SettingsStore.DARK_MODE_KEY) darkMode: boolean = SettingsStore.darkMode;
+  @State recentHistory: Array<ConnectionRecord> = [];
 
-  private quickActions: Array<string> = ['\ud83d\udcc2', '\ud83d\udee1', '\ud83d\udd14'];
+  aboutToAppear() {
+    this.recentHistory = ConnectionStore.list().slice(0, 3);
+  }
+
+  private quickActions: Array<string> = ['📂', '🛡️', '🔔'];
 
   private vaultItems: Array<VaultItem> = [
-    { key: 'hosts', title: 'Hosts', subtitle: 'Manage SSH hosts and saved sessions', icon: '\ud83d\udcbb' },
-    { key: 'keychain', title: 'Keychain', subtitle: 'Local keychain & identity', icon: '\ud83d\udd10' },
-    { key: 'port', title: 'Port forwarding', subtitle: 'Tunnels & jump hosts', icon: '\ud83d\udce6' },
-    { key: 'snippets', title: 'Snippets', subtitle: 'Reuse common commands', icon: '\ud83e\uddce' },
-    { key: 'known', title: 'Known hosts', subtitle: 'Fingerprints you trust', icon: '\ud83e\udded' },
-    { key: 'logs', title: 'Logs', subtitle: 'Recent activity and audit trail', icon: '\ud83d\uddc3', badge: '1' },
+    { key: 'hosts', title: '主机', subtitle: '管理 SSH 主机和保存的会话', icon: '💻' },
+    { key: 'keys', title: '密钥管理', subtitle: '本地密钥与身份管理', icon: '🔑' },
+    { key: 'snippets', title: '代码片段', subtitle: '复用常用命令', icon: '🧞' }
   ];
 
-  private get palette(): LynxPalette { return getLynxPalette(this.darkMode); }
+  private getPalette(): LynxPalette {
+    const p = getLynxPalette(this.darkMode);
+    if (p) return p;
+    return {
+      pageBackground: '#F5F7FA',
+      surface: '#FFFFFFFF',
+      card: '#10E7F0F5',
+      primaryText: '#0F1115',
+      secondaryText: '#6B7280',
+      border: '#11000000',
+      accent: '#1E7DD6'
+    };
+  }
+
+  private connect(item: ConnectionRecord): void {
+    if (item.authType === 'key') {
+      promptAction.showToast({ message: '密钥认证暂未支持' });
+      return;
+    }
+    const password = ConnectionStore.getPassword(item);
+    if (!password) {
+      promptAction.showToast({ message: '请输入密码后连接' });
+      ConnectionStore.currentDraft = ConnectionStore.draftForPasswordInput(item);
+      router.pushUrl({ url: 'pages/AddHost' });
+      return;
+    }
+    ConnectionStore.currentDraft = ConnectionStore.draftFromRecord(item, password);
+    router.pushUrl({ url: 'pages/Terminal' });
+  }
 
   @Builder
   buildQuickActions() {
@@ -37,12 +69,12 @@ export default struct HistoryPage {
             width: 64,
             height: 64,
             borderRadius: 18,
-            backgroundColor: this.palette.card,
+            backgroundColor: this.getPalette().card,
             justifyContent: FlexAlign.Center,
             alignItems: ItemAlign.Center
           }
         }) {
-            LynxText({ content: icon, style: { fontSize: 20, fontColor: this.palette.primaryText } })
+            LynxText({ content: icon, style: { fontSize: 20, fontColor: this.getPalette().primaryText } })
           }
       }, (icon: string, index: number) => index.toString())
     }
@@ -50,12 +82,19 @@ export default struct HistoryPage {
 
   @Builder
   buildVaultItem(item: VaultItem) {
-    LynxRow({ style: { padding: { left: 16, right: 16, top: 14, bottom: 14 }, backgroundColor: this.palette.card, borderRadius: 18 } }) {
-      LynxText({ content: item.icon, style: { fontSize: 20, margin: { right: 12 }, fontColor: this.palette.primaryText } })
+    LynxRow({
+      style: { width: '100%', padding: { left: 16, right: 16, top: 14, bottom: 14 }, backgroundColor: this.getPalette().card, borderRadius: 18 },
+      onTap: (): void => {
+        if (item.key === 'hosts') router.pushUrl({ url: 'pages/HostList' });
+        else if (item.key === 'keys') router.pushUrl({ url: 'pages/SettingsKeys' });
+        else if (item.key === 'snippets') router.pushUrl({ url: 'pages/Snippets' });
+      }
+    }) {
+      LynxText({ content: item.icon, style: { fontSize: 20, margin: { right: 12 }, fontColor: this.getPalette().primaryText } })
 
       LynxColumn({ space: 4 }) {
-        LynxText({ content: item.title, style: { fontSize: 16, fontWeight: FontWeight.Medium, fontColor: this.palette.primaryText } })
-        LynxText({ content: item.subtitle, style: { fontSize: 13, fontColor: this.palette.secondaryText } })
+        LynxText({ content: item.title, style: { fontSize: 16, fontWeight: FontWeight.Medium, fontColor: this.getPalette().primaryText } })
+        LynxText({ content: item.subtitle, style: { fontSize: 13, fontColor: this.getPalette().secondaryText } })
       }
 
       LynxBlank({ style: { layoutWeight: 1 } })
@@ -67,24 +106,43 @@ export default struct HistoryPage {
             style: {
               fontSize: 12,
               fontColor: '#ffffff',
-              backgroundColor: this.palette.accent,
+              backgroundColor: this.getPalette().accent,
               padding: { left: 8, right: 8, top: 4, bottom: 4 },
               borderRadius: 12
             }
           })
         }
-        LynxText({ content: 'тА?', style: { fontSize: 18, fontColor: this.palette.secondaryText } })
+        LynxText({ content: '>', style: { fontSize: 18, fontColor: this.getPalette().secondaryText } })
       }
     }
   }
 
   build() {
-    LynxColumn({ style: { width: '100%', height: '100%', backgroundColor: this.palette.pageBackground } }) {
-      LynxScroll({ style: { width: '100%', height: '100%' }, scrollBar: BarState.Off }) {
+    Column() {
+      LynxScroll({ style: { width: '100%', height: '100%', backgroundColor: this.getPalette().pageBackground }, scrollBar: BarState.Off }) {
         LynxColumn({ space: 16, style: { padding: { left: 16, right: 16, bottom: 20 }, width: '100%' } }) {
-          this.buildQuickActions()
+
+          if (this.recentHistory.length > 0) {
+            LynxColumn({ space: 8 }) {
+              LynxText({ content: '最近连接', style: { fontSize: 18, fontWeight: FontWeight.Bold, fontColor: this.getPalette().primaryText } })
+              ForEach(this.recentHistory, (item: ConnectionRecord) => {
+                LynxRow({
+                  style: { padding: 12, backgroundColor: this.getPalette().surface, borderRadius: 12 },
+                  onTap: (): void => { this.connect(item); }
+                }) {
+                  LynxColumn({ space: 4 }) {
+                    LynxText({ content: item.name, style: { fontSize: 14, fontWeight: FontWeight.Medium, fontColor: this.getPalette().primaryText } })
+                    LynxText({ content: item.time, style: { fontSize: 12, fontColor: this.getPalette().secondaryText } })
+                  }
+                  LynxBlank({ style: { layoutWeight: 1 } })
+                  LynxText({ content: '🚀', style: { fontSize: 16 } })
+                }
+              }, (item: ConnectionRecord) => item.id.toString())
+            }
+          }
 
           LynxColumn({ space: 12 }) {
+            LynxText({ content: '资产管理', style: { fontSize: 18, fontWeight: FontWeight.Bold, fontColor: this.getPalette().primaryText } })
             ForEach(this.vaultItems, (item: VaultItem) => {
               this.buildVaultItem(item)
             }, (item: VaultItem) => item.key)
@@ -92,5 +150,7 @@ export default struct HistoryPage {
         }
       }
     }
+    .width('100%')
+    .height('100%')
   }
 }

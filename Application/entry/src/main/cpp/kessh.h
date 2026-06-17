@@ -14,6 +14,7 @@ struct KesshSession {
 
 // Session management
 napi_value OpenSession(napi_env env, napi_callback_info info);
+napi_value OpenSessionAsync(napi_env env, napi_callback_info info);
 napi_value CloseSession(napi_env env, napi_callback_info info);
 napi_value SetKeepaliveConfig(napi_env env, napi_callback_info info);
 napi_value SendKeepalive(napi_env env, napi_callback_info info);

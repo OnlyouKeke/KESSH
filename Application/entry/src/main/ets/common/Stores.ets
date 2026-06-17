@@ -60,7 +60,7 @@ export class Logger {
   }
 
   static list(): Array<string> {
-    return Logger.logs;
+    return Logger.logs.slice();
   }
 
   static clear(): void {
@@ -84,7 +84,20 @@ export class SettingsStore {
   private static terminalFontSizeValue: number = 14;
 
   static ensureInitialized(): void {
-    // No-op for now; values are kept in-memory.
+    try {
+      AppStorage.SetOrCreate(SettingsStore.DARK_MODE_KEY, SettingsStore.darkModeEnabled);
+      AppStorage.SetOrCreate(SettingsStore.SAVE_PASSWORD_KEY, SettingsStore.savePasswordEnabled);
+      const darkMode = AppStorage.Get<boolean>(SettingsStore.DARK_MODE_KEY);
+      const savePassword = AppStorage.Get<boolean>(SettingsStore.SAVE_PASSWORD_KEY);
+      if (typeof darkMode === 'boolean') {
+        SettingsStore.darkModeEnabled = darkMode;
+      }
+      if (typeof savePassword === 'boolean') {
+        SettingsStore.savePasswordEnabled = savePassword;
+      }
+    } catch (_) {
+      // AppStorage is unavailable in unit-like contexts; keep in-memory defaults.
+    }
   }
 
   static get darkMode(): boolean {
@@ -108,11 +121,21 @@ export class SettingsStore {
 
   static setDarkMode(v: boolean): void {
     SettingsStore.darkModeEnabled = v;
+    try {
+      AppStorage.SetOrCreate(SettingsStore.DARK_MODE_KEY, v);
+    } catch (_) {
+      // ignore
+    }
     Logger.log(`Setting dark_mode=${v}`);
   }
 
   static setSavePassword(v: boolean): void {
     SettingsStore.savePasswordEnabled = v;
+    try {
+      AppStorage.SetOrCreate(SettingsStore.SAVE_PASSWORD_KEY, v);
+    } catch (_) {
+      // ignore
+    }
     Logger.log(`Setting save_password=${v}`);
   }
 
@@ -143,23 +166,129 @@ export class ConnectionStore {
   private static passwords: Map<number, string> = new Map();
   static currentDraft: ConnectionDraft | null = null;
 
+  static parsePort(portText: string): number | null {
+    const value = (portText || '').trim();
+    if (!/^\d+$/.test(value)) {
+      return null;
+    }
+    const port = parseInt(value, 10);
+    if (Number.isNaN(port) || port < 1 || port > 65535) {
+      return null;
+    }
+    return port;
+  }
+
+  static validateDraft(draft: ConnectionDraft): string | null {
+    if (!draft.host || draft.host.trim().length === 0) {
+      return '请填写主机地址';
+    }
+    if (/\s/.test(draft.host.trim())) {
+      return '主机地址不能包含空白字符';
+    }
+    if (!draft.username || draft.username.trim().length === 0) {
+      return '请填写用户名';
+    }
+    if (ConnectionStore.parsePort(draft.port || '22') === null) {
+      return '端口必须是 1-65535 的数字';
+    }
+    return null;
+  }
+
+  static normalizeDraft(draft: ConnectionDraft): ConnectionDraft {
+    const port = ConnectionStore.parsePort(draft.port || '22') ?? 22;
+    return {
+      host: (draft.host || '').trim(),
+      port: port.toString(),
+      username: (draft.username || '').trim(),
+      password: draft.password,
+      privateKey: draft.privateKey,
+      publicKey: draft.publicKey,
+      passphrase: draft.passphrase,
+      isEditing: draft.isEditing,
+      editingId: draft.editingId
+    };
+  }
+
+  private static cloneRecord(record: ConnectionRecord): ConnectionRecord {
+    return {
+      id: record.id,
+      name: record.name,
+      host: record.host,
+      port: record.port,
+      username: record.username,
+      authType: record.authType,
+      time: record.time
+    };
+  }
+
+  private static findInternal(id: number): ConnectionRecord | null {
+    for (let i = 0; i < ConnectionStore.history.length; i++) {
+      if (ConnectionStore.history[i].id === id) {
+        return ConnectionStore.history[i];
+      }
+    }
+    return null;
+  }
+
   static addFromDraft(draft: ConnectionDraft, authType: AuthType): ConnectionRecord {
+    const validation = ConnectionStore.validateDraft(draft);
+    if (validation) {
+      throw new Error(validation);
+    }
+    const normalized = ConnectionStore.normalizeDraft(draft);
+    const port = ConnectionStore.parsePort(normalized.port) ?? 22;
+
+    if (normalized.isEditing && normalized.editingId !== undefined) {
+      const existing = ConnectionStore.findInternal(normalized.editingId);
+      if (existing) {
+        existing.name = `${normalized.username}@${normalized.host}:${port}`;
+        existing.host = normalized.host;
+        existing.port = port;
+        existing.username = normalized.username;
+        existing.authType = authType;
+        existing.time = ConnectionStore.nowLabel();
+        Logger.log(`History: update ${existing.name}`);
+        return ConnectionStore.cloneRecord(existing);
+      }
+    }
+
     const record: ConnectionRecord = {
       id: ConnectionStore.seq++,
-      name: `${draft.username}@${draft.host}:${draft.port}`,
-      host: draft.host,
-      port: parseInt(draft.port || '22'),
-      username: draft.username,
+      name: `${normalized.username}@${normalized.host}:${port}`,
+      host: normalized.host,
+      port,
+      username: normalized.username,
       authType,
       time: ConnectionStore.nowLabel()
     };
     ConnectionStore.history.unshift(record);
     Logger.log(`History: add ${record.name}`);
-    return record;
+    return ConnectionStore.cloneRecord(record);
+  }
+
+  static draftFromRecord(record: ConnectionRecord, password?: string): ConnectionDraft {
+    const draft: ConnectionDraft = {
+      host: record.host,
+      port: record.port.toString(),
+      username: record.username
+    };
+    if (record.authType === 'password') {
+      draft.password = password ?? '';
+    }
+    return draft;
+  }
+
+  static draftForPasswordInput(record: ConnectionRecord): ConnectionDraft {
+    const draft = ConnectionStore.draftFromRecord(record, '');
+    draft.isEditing = true;
+    draft.editingId = record.id;
+    return draft;
   }
 
   static savePassword(record: ConnectionRecord, password: string): void {
-    ConnectionStore.passwords.set(record.id, password);
+    if (password.length > 0) {
+      ConnectionStore.passwords.set(record.id, password);
+    }
   }
 
   static getPassword(record: ConnectionRecord | null): string | null {
@@ -167,13 +296,49 @@ export class ConnectionStore {
     return ConnectionStore.passwords.get(record.id) ?? null;
   }
 
-  static list(): Array<ConnectionRecord> { return ConnectionStore.history; }
+  static getById(id: number): ConnectionRecord | null {
+    const record = ConnectionStore.findInternal(id);
+    return record ? ConnectionStore.cloneRecord(record) : null;
+  }
+
+  static list(): Array<ConnectionRecord> {
+    return ConnectionStore.history.map((item: ConnectionRecord): ConnectionRecord => ConnectionStore.cloneRecord(item));
+  }
 
   static nowLabel(): string {
     const d = new Date();
     const hh = d.getHours().toString().padStart(2, '0');
     const mm = d.getMinutes().toString().padStart(2, '0');
     return `Today ${hh}:${mm}`;
+  }
+}
+
+export interface Snippet {
+  id: number;
+  title: string;
+  command: string;
+}
+
+export class SnippetStore {
+  private static seq: number = 3;
+  private static snippets: Array<Snippet> = [
+    { id: 0, title: 'List files', command: 'ls -la' },
+    { id: 1, title: 'Check disk', command: 'df -h' },
+    { id: 2, title: 'Check memory', command: 'free -m' }
+  ];
+
+  static list(): Array<Snippet> {
+    return SnippetStore.snippets.map((item: Snippet): Snippet => {
+      return { id: item.id, title: item.title, command: item.command };
+    });
+  }
+
+  static add(title: string, command: string): void {
+    SnippetStore.snippets.push({ id: SnippetStore.seq++, title, command });
+  }
+
+  static remove(id: number): void {
+    SnippetStore.snippets = SnippetStore.snippets.filter(s => s.id !== id);
   }
 }
 
@@ -189,11 +354,31 @@ export class KeyStore {
     return k;
   }
 
-  static list(): Array<ImportedKey> { return KeyStore.keys; }
+  static list(): Array<ImportedKey> {
+    return KeyStore.keys.map((item: ImportedKey): ImportedKey => {
+      return {
+        id: item.id,
+        name: item.name,
+        content: item.content,
+        publicKey: item.publicKey,
+        passphrase: item.passphrase,
+        fingerprint: item.fingerprint
+      };
+    });
+  }
 
   static getById(id: number): ImportedKey | null {
     for (let i = 0; i < KeyStore.keys.length; i++) {
-      if (KeyStore.keys[i].id === id) { return KeyStore.keys[i]; }
+      if (KeyStore.keys[i].id === id) {
+        return {
+          id: KeyStore.keys[i].id,
+          name: KeyStore.keys[i].name,
+          content: KeyStore.keys[i].content,
+          publicKey: KeyStore.keys[i].publicKey,
+          passphrase: KeyStore.keys[i].passphrase,
+          fingerprint: KeyStore.keys[i].fingerprint
+        };
+      }
     }
     return null;
   }

@@ -19,72 +19,100 @@ export interface LynxContainerProps {
   onClick?: () => void;
 }
 
-@Builder
-export function LynxColumn(props: LynxContainerProps = {}, content: () => void) {
-  Column({ space: props.space ?? 0 }) {
-    content();
+@Component
+export struct LynxColumn {
+  @Prop style?: LynxStyle;
+  @Prop space?: number;
+  onTap?: () => void;
+  @BuilderParam content?: () => void;
+
+  build() {
+    Column({ space: this.space ?? 0 }) {
+      if (this.content) {
+        this.content()
+      }
+    }
+    .width(this.style?.width)
+    .height(this.style?.height)
+    .padding(this.style?.padding as Padding)
+    .margin(this.style?.margin as Margin)
+    .backgroundColor(this.style?.backgroundColor)
+    .borderRadius(this.style?.borderRadius as number)
+    .layoutWeight(this.style?.layoutWeight)
+    .justifyContent(this.style?.justifyContent as FlexAlign)
+    .alignItems(this.style?.alignItems as HorizontalAlign)
+    .opacity(this.style?.opacity)
+    .borderColor(this.style?.borderColor)
+    .borderWidth(this.style?.borderWidth)
+    .onClick((_event: ClickEvent): void => { this.onTap?.(); });
   }
-  .width(props.style?.width)
-  .height(props.style?.height)
-  .padding(props.style?.padding as Padding)
-  .margin(props.style?.margin as Margin)
-  .backgroundColor(props.style?.backgroundColor)
-  .borderRadius(props.style?.borderRadius as number)
-  .layoutWeight(props.style?.layoutWeight)
-  .justifyContent(props.style?.justifyContent as FlexAlign)
-  .alignItems(props.style?.alignItems as HorizontalAlign)
-  .opacity(props.style?.opacity)
-  .borderColor(props.style?.borderColor)
-  .borderWidth(props.style?.borderWidth)
-  .onClick(props.onClick ?? undefined);
 }
 
-@Builder
-export function LynxRow(props: LynxContainerProps = {}, content: () => void) {
-  Row({ space: props.space ?? 0 }) {
-    content();
+@Component
+export struct LynxRow {
+  @Prop style?: LynxStyle;
+  @Prop space?: number;
+  onTap?: () => void;
+  @BuilderParam content?: () => void;
+
+  build() {
+    Row({ space: this.space ?? 0 }) {
+      if (this.content) {
+        this.content()
+      }
+    }
+    .width(this.style?.width)
+    .height(this.style?.height)
+    .padding(this.style?.padding as Padding)
+    .margin(this.style?.margin as Margin)
+    .backgroundColor(this.style?.backgroundColor)
+    .borderRadius(this.style?.borderRadius as number)
+    .layoutWeight(this.style?.layoutWeight)
+    .justifyContent(this.style?.justifyContent as FlexAlign)
+    .alignItems(this.style?.alignItems as VerticalAlign)
+    .opacity(this.style?.opacity)
+    .borderColor(this.style?.borderColor)
+    .borderWidth(this.style?.borderWidth)
+    .onClick((_event: ClickEvent): void => { this.onTap?.(); });
   }
-  .width(props.style?.width)
-  .height(props.style?.height)
-  .padding(props.style?.padding as Padding)
-  .margin(props.style?.margin as Margin)
-  .backgroundColor(props.style?.backgroundColor)
-  .borderRadius(props.style?.borderRadius as number)
-  .layoutWeight(props.style?.layoutWeight)
-  .justifyContent(props.style?.justifyContent as FlexAlign)
-  .alignItems(props.style?.alignItems as VerticalAlign)
-  .opacity(props.style?.opacity)
-  .borderColor(props.style?.borderColor)
-  .borderWidth(props.style?.borderWidth)
-  .onClick(props.onClick ?? undefined);
 }
 
 export interface LynxScrollProps extends LynxContainerProps {
   scrollBar?: BarState;
 }
 
-@Builder
-export function LynxScroll(props: LynxScrollProps = {}, content: () => void) {
-  Scroll() {
-    content();
+@Component
+export struct LynxScroll {
+  @Prop style?: LynxStyle;
+  @Prop scrollBar?: BarState;
+  @Prop onTap?: () => void;
+  @BuilderParam content?: () => void;
+
+  build() {
+    Scroll() {
+      if (this.content) {
+        this.content()
+      }
+    }
+    .scrollBar(this.scrollBar ?? BarState.Off)
+    .width(this.style?.width)
+    .height(this.style?.height)
+    .padding(this.style?.padding as Padding)
+    .margin(this.style?.margin as Margin)
+    .backgroundColor(this.style?.backgroundColor)
+    .borderRadius(this.style?.borderRadius as number)
+    .layoutWeight(this.style?.layoutWeight)
+    .opacity(this.style?.opacity)
+    .borderColor(this.style?.borderColor)
+    .borderWidth(this.style?.borderWidth)
+    .onClick((_event: ClickEvent): void => { this.onTap?.(); });
   }
-  .scrollBar(props.scrollBar ?? BarState.Off)
-  .width(props.style?.width)
-  .height(props.style?.height)
-  .padding(props.style?.padding as Padding)
-  .margin(props.style?.margin as Margin)
-  .backgroundColor(props.style?.backgroundColor)
-  .borderRadius(props.style?.borderRadius as number)
-  .layoutWeight(props.style?.layoutWeight)
-  .opacity(props.style?.opacity)
-  .borderColor(props.style?.borderColor)
-  .borderWidth(props.style?.borderWidth)
-  .onClick(props.onClick ?? undefined);
 }
 
 export interface LynxTextStyle extends LynxStyle {
   fontSize?: number | string;
   fontWeight?: FontWeight;
+  fontFamily?: string;
   fontColor?: string | Color;
   textAlign?: TextAlign;
   maxLines?: number;
@@ -101,6 +129,7 @@ export function LynxText(props: LynxTextProps) {
   Text(props.content)
     .fontSize(props.style?.fontSize)
     .fontWeight(props.style?.fontWeight)
+    .fontFamily(props.style?.fontFamily)
     .fontColor(props.style?.fontColor)
     .textAlign(props.style?.textAlign)
     .maxLines(props.style?.maxLines)
@@ -236,58 +265,88 @@ export interface LynxListProps {
   onClick?: () => void;
 }
 
-@Builder
-export function LynxList(props: LynxListProps = {}, content: () => void) {
-  List() { content(); }
-    .divider(props.divider)
-    .edgeEffect(props.edgeEffect)
-    .width(props.style?.width)
-    .height(props.style?.height)
-    .padding(props.style?.padding as Padding)
-    .margin(props.style?.margin as Margin)
-    .backgroundColor(props.style?.backgroundColor)
-    .borderRadius(props.style?.borderRadius as number)
-    .layoutWeight(props.style?.layoutWeight)
-    .opacity(props.style?.opacity)
-    .borderColor(props.style?.borderColor)
-    .borderWidth(props.style?.borderWidth)
-    .onClick(props.onClick ?? undefined);
+@Component
+export struct LynxList {
+  @Prop style?: LynxStyle;
+  @Prop divider?: ListDividerOptions;
+  @Prop edgeEffect?: EdgeEffect;
+  onTap?: () => void;
+  @BuilderParam content?: () => void;
+
+  build() {
+    List() {
+      if (this.content) {
+        this.content()
+      }
+    }
+    .divider(this.divider)
+    .edgeEffect(this.edgeEffect)
+    .width(this.style?.width)
+    .height(this.style?.height)
+    .padding(this.style?.padding as Padding)
+    .margin(this.style?.margin as Margin)
+    .backgroundColor(this.style?.backgroundColor)
+    .borderRadius(this.style?.borderRadius as number)
+    .layoutWeight(this.style?.layoutWeight)
+    .opacity(this.style?.opacity)
+    .borderColor(this.style?.borderColor)
+    .borderWidth(this.style?.borderWidth)
+    .onClick((_event: ClickEvent): void => { this.onTap?.(); });
+  }
 }
 
 export interface LynxListItemProps extends LynxContainerProps {}
 
-@Builder
-export function LynxListItem(props: LynxListItemProps = {}, content: () => void) {
-  ListItem() { content(); }
-    .width(props.style?.width)
-    .height(props.style?.height)
-    .padding(props.style?.padding as Padding)
-    .margin(props.style?.margin as Margin)
-    .backgroundColor(props.style?.backgroundColor)
-    .borderRadius(props.style?.borderRadius as number)
-    .layoutWeight(props.style?.layoutWeight)
-    .opacity(props.style?.opacity)
-    .borderColor(props.style?.borderColor)
-    .borderWidth(props.style?.borderWidth)
-    .onClick(props.onClick ?? undefined);
+@Component
+export struct LynxListItem {
+  @Prop style?: LynxStyle;
+  onTap?: () => void;
+  @BuilderParam content?: () => void;
+
+  build() {
+    ListItem() {
+      if (this.content) {
+        this.content()
+      }
+    }
+    .width(this.style?.width)
+    .height(this.style?.height)
+    .padding(this.style?.padding as Padding)
+    .margin(this.style?.margin as Margin)
+    .backgroundColor(this.style?.backgroundColor)
+    .borderRadius(this.style?.borderRadius as number)
+    .layoutWeight(this.style?.layoutWeight)
+    .opacity(this.style?.opacity)
+    .borderColor(this.style?.borderColor)
+    .borderWidth(this.style?.borderWidth)
+    .onClick((_event: ClickEvent): void => { this.onTap?.(); });
+  }
 }
 
 export interface LynxFlexProps extends LynxContainerProps { align?: Alignment; }
 
-@Builder
-export function LynxFlex(props: LynxFlexProps = {}, content: () => void) {
-  Flex({ alignItems: props.style?.alignItems as ItemAlign, justifyContent: props.style?.justifyContent as FlexAlign }) {
-    content();
+@Component
+export struct LynxFlex {
+  @Prop style?: LynxStyle;
+  onTap?: () => void;
+  @BuilderParam content?: () => void;
+
+  build() {
+    Flex({ alignItems: this.style?.alignItems as ItemAlign, justifyContent: this.style?.justifyContent as FlexAlign }) {
+      if (this.content) {
+        this.content()
+      }
+    }
+    .width(this.style?.width)
+    .height(this.style?.height)
+    .padding(this.style?.padding as Padding)
+    .margin(this.style?.margin as Margin)
+    .backgroundColor(this.style?.backgroundColor)
+    .borderRadius(this.style?.borderRadius as number)
+    .layoutWeight(this.style?.layoutWeight)
+    .opacity(this.style?.opacity)
+    .borderColor(this.style?.borderColor)
+    .borderWidth(this.style?.borderWidth)
+    .onClick((_event: ClickEvent): void => { this.onTap?.(); });
   }
-  .width(props.style?.width)
-  .height(props.style?.height)
-  .padding(props.style?.padding as Padding)
-  .margin(props.style?.margin as Margin)
-  .backgroundColor(props.style?.backgroundColor)
-  .borderRadius(props.style?.borderRadius as number)
-  .layoutWeight(props.style?.layoutWeight)
-  .opacity(props.style?.opacity)
-  .borderColor(props.style?.borderColor)
-  .borderWidth(props.style?.borderWidth)
-  .onClick(props.onClick ?? undefined);
 }

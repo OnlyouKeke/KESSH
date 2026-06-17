@@ -14,9 +14,21 @@ export struct SettingsSession {
     this.attemptsInput = SettingsStore.sessionKeepaliveAttempts.toString();
   }
 
-  private parseValue(value: string, fallback: number): number {
+  private parseValue(value: string, fallback: number, min: number, max: number): number {
+    if (!/^\d+$/.test(value.trim())) {
+      return fallback;
+    }
     const parsed = parseInt(value, 10);
-    return Number.isNaN(parsed) ? fallback : parsed;
+    if (Number.isNaN(parsed)) {
+      return fallback;
+    }
+    if (parsed < min) {
+      return min;
+    }
+    if (parsed > max) {
+      return max;
+    }
+    return parsed;
   }
 
   private async saveSettings(): Promise<void> {
@@ -25,8 +37,8 @@ export struct SettingsSession {
     }
     this.saving = true;
     try {
-      const interval = this.parseValue(this.intervalInput, SettingsStore.sessionKeepaliveInterval);
-      const attempts = this.parseValue(this.attemptsInput, SettingsStore.sessionKeepaliveAttempts);
+      const interval = this.parseValue(this.intervalInput, SettingsStore.sessionKeepaliveInterval, 5, 3600);
+      const attempts = this.parseValue(this.attemptsInput, SettingsStore.sessionKeepaliveAttempts, 1, 10);
       await SettingsStore.setSessionKeepaliveInterval(interval);
       await SettingsStore.setSessionKeepaliveAttempts(attempts);
       SSHEngine.configureKeepalive(SettingsStore.sessionKeepaliveInterval, SettingsStore.sessionKeepaliveAttempts);

@@ -15,13 +15,34 @@ struct Index {
   @State currentIndex: number = 0;
   @StorageLink(SettingsStore.DARK_MODE_KEY) darkMode: boolean = SettingsStore.darkMode;
 
-  private get palette(): LynxPalette { return getLynxPalette(this.darkMode); }
-
   aboutToAppear(): void {
+    SettingsStore.ensureInitialized();
     if (!startupProbeDone) {
       startupProbeDone = true;
       SSHEngine.startupDiagnostic();
     }
+  }
+
+  private getPalette(): LynxPalette {
+    let p: LynxPalette | undefined;
+    try {
+      p = getLynxPalette(this.darkMode);
+    } catch (e) {
+      // ignore
+    }
+
+    if (p) {
+      return p;
+    }
+    return {
+      pageBackground: '#F5F7FA',
+      surface: '#FFFFFFFF',
+      card: '#10E7F0F5',
+      primaryText: '#0F1115',
+      secondaryText: '#6B7280',
+      border: '#11000000',
+      accent: '#1E7DD6'
+    };
   }
 
   build() {
@@ -30,16 +51,16 @@ struct Index {
       LynxBlank({ style: { height: 36, width: '100%' } })
 
       // 顶部标题栏
-      TitleBar({ title: this.currentIndex === 0 ? 'Personal' : (this.currentIndex === 1 ? 'Connections' : 'Settings'), showActions: false })
+      TitleBar({ title: this.currentIndex === 0 ? '个人' : (this.currentIndex === 1 ? '连接' : '设置'), showActions: false })
 
       // Tab 内容
       Tabs({ index: this.currentIndex }) {
         TabContent() { HistoryPage(); }
-          .tabBar({ text: 'Vaults' });
+          .tabBar({ text: '资产' });
         TabContent() { SSHNewPage(); }
-          .tabBar({ text: 'Connections' });
+          .tabBar({ text: '连接' });
         TabContent() { SettingsPage(); }
-          .tabBar({ text: 'Settings' });
+          .tabBar({ text: '设置' });
       }
       .barPosition(BarPosition.End)
       .barMode(BarMode.Fixed)
@@ -49,6 +70,6 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.palette.pageBackground);
+    .backgroundColor(this.getPalette().pageBackground);
   }
 }

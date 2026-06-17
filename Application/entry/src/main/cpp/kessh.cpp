@@ -55,11 +55,11 @@ void log_error(const char* format, ...) {
 
 // Helper to get string argument
 static std::string get_string_arg(napi_env env, napi_value value) {
-    size_t len;
+    size_t len = 0;
     napi_get_value_string_utf8(env, value, nullptr, 0, &len);
-    std::string str(len, 0);
-    napi_get_value_string_utf8(env, value, &str[0], len + 1, &len);
-    return str;
+    std::vector<char> buffer(len + 1, '\0');
+    napi_get_value_string_utf8(env, value, buffer.data(), buffer.size(), &len);
+    return std::string(buffer.data(), len);
 }
 
 static bool is_valid_host(const std::string &host)
@@ -76,313 +76,386 @@ static bool is_valid_host(const std::string &host)
     return true;
 }
 
-napi_value OpenSession(napi_env env, napi_callback_info info) {
-    OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[C++ ENTRY] OpenSession function entered");
-    log_info("[C++ STEP 1] OpenSession called");
-    
-    size_t argc = 4;
-    napi_value args[4];
-    napi_status status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    
-    if (status != napi_ok || argc != 4) {
-        log_error("[C++ STEP 2 ERROR] Invalid arguments count: %zu, status: %d", argc, status);
-        napi_throw_error(env, nullptr, "Invalid arguments");
-        return nullptr;
-    }
-    
-    log_info("[C++ STEP 3] Parsing arguments...");
-
-    // Add null checks for safety
-    if (args[0] == nullptr || args[1] == nullptr || args[2] == nullptr || args[3] == nullptr) {
-        log_error("[C++ STEP 3.5 ERROR] One or more arguments are null");
-        napi_throw_error(env, nullptr, "Null argument detected");
-        return nullptr;
-    }
-
-    std::string host = get_string_arg(env, args[0]);
-    if (host.empty()) {
-        log_error("[C++ STEP 3.6 ERROR] Host is empty");
-        napi_throw_error(env, nullptr, "Host cannot be empty");
-        return nullptr;
-    }
-    int32_t port;
-    napi_get_value_int32(env, args[1], &port);
-    std::string user = get_string_arg(env, args[2]);
-    std::string pass = get_string_arg(env, args[3]);
-
-    log_info("[C++ STEP 4] Arguments parsed - host:%s port:%d user:%s", host.c_str(), port, user.c_str());
-    log_info("[C++ STEP 5] Creating socket...");
-
-    // Create socket
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
-        log_error("[C++ STEP 6 ERROR] Failed to create socket: %s", strerror(errno));
-        napi_throw_error(env, nullptr, "Failed to create socket");
-        return nullptr;
-    }
-
-    log_info("[C++ STEP 7] Socket created: fd=%d", sock);
-    log_info("[C++ STEP 8] Ensuring BLOCKING mode for socket");
-
-    // 显式确保socket是阻塞模式
-    int flags = fcntl(sock, F_GETFL, 0);
-    if (flags < 0) {
-        log_error("[C++ STEP 8.1 ERROR] Failed to get socket flags: %s", strerror(errno));
-        close(sock);
-        napi_throw_error(env, nullptr, "Failed to get socket flags");
-        return nullptr;
-    }
-    
-    log_info("[C++ STEP 8.1] Current socket flags: 0x%x (O_NONBLOCK=%s)", flags, (flags & O_NONBLOCK) ? "YES" : "NO");
-    
-    // 清除 O_NONBLOCK 标志，确保阻塞模式
-    if (flags & O_NONBLOCK) {
-        log_info("[C++ STEP 8.2] Socket is non-blocking, setting to blocking mode...");
-        flags &= ~O_NONBLOCK;
-        if (fcntl(sock, F_SETFL, flags) < 0) {
-            log_error("[C++ STEP 8.3 ERROR] Failed to set socket to blocking mode: %s", strerror(errno));
-            close(sock);
-            napi_throw_error(env, nullptr, "Failed to set socket to blocking mode");
-            return nullptr;
+static bool shell_quote_arg(const std::string &value, std::string &quoted, std::string &error)
+{
+    quoted.clear();
+    for (char c : value) {
+        if (c == '\0' || c == '\r' || c == '\n') {
+            error = "Remote path contains invalid control characters";
+            return false;
         }
-        log_info("[C++ STEP 8.4] Socket set to BLOCKING mode successfully");
-    } else {
-        log_info("[C++ STEP 8.2] Socket is already in BLOCKING mode");
     }
 
-    // Set socket timeout for blocking operations
+    quoted = "'";
+    for (char c : value) {
+        if (c == '\'') {
+            quoted += "'\\''";
+        } else {
+            quoted += c;
+        }
+    }
+    quoted += "'";
+    return true;
+}
+
+static bool ensure_libssh2_initialized(std::string &error)
+{
+    std::lock_guard<std::mutex> lock(init_mutex);
+    if (libssh2_initialized) {
+        return true;
+    }
+
+    log_info("[LIBSSH2 INIT] Calling libssh2_init(0)");
+    int rc = libssh2_init(0);
+    if (rc != 0) {
+        error = "Failed to initialize libssh2";
+        log_error("[LIBSSH2 INIT ERROR] libssh2_init failed: rc=%d", rc);
+        return false;
+    }
+    libssh2_initialized = true;
+    log_info("[LIBSSH2 INIT SUCCESS] libssh2 initialized");
+    return true;
+}
+
+static std::string last_session_error(LIBSSH2_SESSION *session, const char *fallback)
+{
+    if (!session) {
+        return fallback;
+    }
+    char *errmsg = nullptr;
+    int errlen = 0;
+    libssh2_session_last_error(session, &errmsg, &errlen, 0);
+    if (errmsg && errlen > 0) {
+        return std::string(errmsg, errlen);
+    }
+    return fallback;
+}
+
+static bool set_socket_timeouts(int sock, int timeout_seconds)
+{
     struct timeval timeout;
-    timeout.tv_sec = 10;  // 10 seconds timeout for connect
+    timeout.tv_sec = timeout_seconds;
     timeout.tv_usec = 0;
-    
-    log_info("[C++ STEP 8.5] Setting socket send timeout...");
+
+    bool ok = true;
     if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
-        log_error("[C++ STEP 8.6 ERROR] Failed to set send timeout: %s", strerror(errno));
+        log_error("Failed to set socket send timeout: %s", strerror(errno));
+        ok = false;
     }
-    
-    log_info("[C++ STEP 8.7] Setting socket receive timeout...");
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
-        log_error("[C++ STEP 8.8 ERROR] Failed to set receive timeout: %s", strerror(errno));
+        log_error("Failed to set socket receive timeout: %s", strerror(errno));
+        ok = false;
+    }
+    return ok;
+}
+
+static int connect_tcp_socket(const std::string &host, int32_t port, std::string &error)
+{
+    if (!is_valid_host(host)) {
+        error = "Invalid host";
+        return -1;
+    }
+    if (port < 1 || port > 65535) {
+        error = "Invalid port";
+        return -1;
     }
 
-    log_info("[C++ STEP 9] Preparing sockaddr...");
+    struct addrinfo hints = {};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_ADDRCONFIG;
 
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
-    
-    if (inet_pton(AF_INET, host.c_str(), &server_addr.sin_addr) <= 0) {
-        log_error("[C++ STEP 10 ERROR] Invalid address: %s", host.c_str());
-        close(sock);
-        napi_throw_error(env, nullptr, "Invalid address");
-        return nullptr;
+    struct addrinfo *addr_result = nullptr;
+    std::string port_string = std::to_string(port);
+    int addr_status = getaddrinfo(host.c_str(), port_string.c_str(), &hints, &addr_result);
+    if (addr_status != 0) {
+        error = std::string("Address resolution failed: ") + gai_strerror(addr_status);
+        log_error("[OPEN ERROR] DNS resolution failed for %s:%d: %s", host.c_str(), port, gai_strerror(addr_status));
+        return -1;
     }
 
-    log_info("[C++ STEP 11] Address parsed successfully");
-    log_info("[C++ STEP 12] Attempting to connect to %s:%d (BLOCKING mode with 10s timeout)...", host.c_str(), port);
-
-    // 阻塞模式连接，socket 已设置超时
-    // 重试机制：如果被信号中断（EINTR），则重试
-    int connect_result;
-    int retry_count = 0;
-    const int MAX_RETRIES = 3;
-    
-    do {
-        connect_result = connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
-        
-        if (connect_result == 0) {
-            // 连接成功
-            break;
-        }
-        
-        if (errno == EINTR) {
-            // 被信号中断，重试
-            retry_count++;
-            log_info("[C++ STEP 12.%d] connect() interrupted (EINTR), retrying... (%d/%d)", 
-                retry_count, retry_count, MAX_RETRIES);
-            
-            if (retry_count >= MAX_RETRIES) {
-                log_error("[C++ STEP 13 ERROR] connect() failed after %d retries: %s (errno=%d)", 
-                    MAX_RETRIES, strerror(errno), errno);
-                close(sock);
-                napi_throw_error(env, nullptr, "Failed to connect: too many interruptions");
-                return nullptr;
-            }
-            // 继续重试
+    int last_error = 0;
+    for (struct addrinfo *ai = addr_result; ai != nullptr; ai = ai->ai_next) {
+        int sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (sock < 0) {
+            last_error = errno;
+            log_error("[OPEN ERROR] Failed to create socket: %s", strerror(errno));
             continue;
-        } else if (errno == EINPROGRESS || errno == ETIMEDOUT) {
-            // 在设置了超时的阻塞模式下,connect()可能返回EINPROGRESS表示超时
-            // 这是因为SO_SNDTIMEO导致的,并非真正的非阻塞模式问题
-            log_error("[C++ STEP 13 ERROR] connect() timeout: %s (errno=%d)", strerror(errno), errno);
-            log_error("[C++ STEP 13.1 ERROR] Unable to reach %s:%d within timeout period", host.c_str(), port);
-            log_error("[C++ STEP 13.2 ERROR] Please check: 1) Network connectivity 2) Firewall rules 3) Server availability");
-            close(sock);
-            napi_throw_error(env, nullptr, "Connection timeout: unable to reach server");
-            return nullptr;
-        } else {
-            // 其他错误，不重试
-            log_error("[C++ STEP 13 ERROR] connect() failed: %s (errno=%d)", strerror(errno), errno);
-            close(sock);
-            napi_throw_error(env, nullptr, "Failed to connect");
-            return nullptr;
         }
-    } while (connect_result < 0 && errno == EINTR);
 
-    log_info("[C++ STEP 14] TCP connection established successfully!");
-    log_info("[C++ STEP 21] Initializing libssh2 (lazy init)...");
-    
-    // Initialize libssh2 lazily on first use
-    {
-        std::lock_guard<std::mutex> lock(init_mutex);
-        if (!libssh2_initialized) {
-            OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[LIBSSH2 INIT] First time init");
-            log_info("[C++ STEP 22] Calling libssh2_init(0)...");
-            
-            int rc = libssh2_init(0);
-            if (rc != 0) {
-                OH_LOG_Print(LOG_APP, LOG_ERROR, LOG_DOMAIN, LOG_TAG, "[LIBSSH2 INIT ERROR] libssh2_init failed: rc=%d", rc);
-                log_error("[C++ STEP 23 ERROR] libssh2_init failed: rc=%d", rc);
-                close(sock);
-                napi_throw_error(env, nullptr, "Failed to initialize libssh2");
-                return nullptr;
+        set_socket_timeouts(sock, 10);
+
+        int connect_result = -1;
+        int retry_count = 0;
+        const int max_retries = 3;
+        do {
+            connect_result = connect(sock, ai->ai_addr, ai->ai_addrlen);
+            if (connect_result == 0 || errno == EISCONN) {
+                freeaddrinfo(addr_result);
+                return sock;
             }
-            libssh2_initialized = true;
-            OH_LOG_Print(LOG_APP, LOG_INFO, LOG_DOMAIN, LOG_TAG, "[LIBSSH2 INIT SUCCESS] libssh2 initialized");
-            log_info("[C++ STEP 23] libssh2 initialized successfully (first time)");
-        } else {
-            log_info("[C++ STEP 23] libssh2 already initialized, skipping");
-        }
+            if (errno == EINTR) {
+                retry_count++;
+                continue;
+            }
+            break;
+        } while (retry_count < max_retries);
+
+        last_error = errno;
+        log_error("[OPEN ERROR] connect failed for %s:%d: %s", host.c_str(), port, strerror(errno));
+        close(sock);
     }
-    
-    log_info("[C++ STEP 24] Creating libssh2 session...");
+
+    if (addr_result != nullptr) {
+        freeaddrinfo(addr_result);
+    }
+    if (last_error == 0) {
+        error = "Failed to connect";
+    } else if (last_error == EINPROGRESS || last_error == ETIMEDOUT) {
+        error = "Connection timeout: unable to reach server";
+    } else {
+        error = std::string("Failed to connect: ") + strerror(last_error);
+    }
+    return -1;
+}
+
+static void cleanup_open_failure(LIBSSH2_SESSION *session, LIBSSH2_CHANNEL *channel, int sock, const char *reason)
+{
+    if (channel) {
+        libssh2_channel_free(channel);
+    }
+    if (session) {
+        if (reason) {
+            libssh2_session_disconnect(session, reason);
+        }
+        libssh2_session_free(session);
+    }
+    if (sock >= 0) {
+        close(sock);
+    }
+}
+
+static int open_session_internal(const std::string &host, int32_t port, const std::string &user, const std::string &pass, std::string &error)
+{
+    log_info("Opening SSH session host:%s port:%d user:%s", host.c_str(), port, user.c_str());
+
+    if (host.empty()) {
+        error = "Host cannot be empty";
+        return -1;
+    }
+    if (user.empty()) {
+        error = "Username cannot be empty";
+        return -1;
+    }
+
+    int sock = connect_tcp_socket(host, port, error);
+    if (sock < 0) {
+        return -1;
+    }
+
+    if (!ensure_libssh2_initialized(error)) {
+        close(sock);
+        return -1;
+    }
 
     LIBSSH2_SESSION *session = libssh2_session_init();
     if (!session) {
-        log_error("[C++ STEP 25 ERROR] libssh2_session_init failed");
+        error = "Failed to create libssh2 session";
         close(sock);
-        libssh2_exit();
-        napi_throw_error(env, nullptr, "Failed to create libssh2 session");
-        return nullptr;
+        return -1;
     }
 
-    log_info("[C++ STEP 26] libssh2 session created");
-    log_info("[C++ STEP 27] Setting session timeout...");
-
-    // Set timeout
-    libssh2_session_set_timeout(session, 5000); // 5 seconds
-
-    log_info("[C++ STEP 28] Starting SSH handshake...");
+    libssh2_session_set_timeout(session, 5000);
 
     if (libssh2_session_handshake(session, sock)) {
-        char *errmsg;
-        int errlen;
-        libssh2_session_last_error(session, &errmsg, &errlen, 0);
-        log_error("[C++ STEP 29 ERROR] SSH handshake failed: %.*s", errlen, errmsg);
-        libssh2_session_free(session);
-        close(sock);
-        libssh2_exit();
-        napi_throw_error(env, nullptr, "SSH handshake failed");
-        return nullptr;
+        error = last_session_error(session, "SSH handshake failed");
+        log_error("SSH handshake failed: %s", error.c_str());
+        cleanup_open_failure(session, nullptr, sock, nullptr);
+        return -1;
     }
 
-    log_info("[C++ STEP 30] SSH handshake successful");
     int configured_keepalive = 0;
     {
         std::lock_guard<std::mutex> keepalive_lock(keepalive_config_mutex);
         configured_keepalive = keepalive_interval_seconds;
     }
     libssh2_keepalive_config(session, 1, configured_keepalive > 0 ? configured_keepalive : 0);
-    log_info("[C++ KEEPALIVE] Configured keepalive interval=%d seconds", configured_keepalive);
 
-    log_info("[C++ STEP 31] Authenticating with password...");
-
-    // Authenticate
     if (libssh2_userauth_password(session, user.c_str(), pass.c_str())) {
-        char *errmsg;
-        int errlen;
-        libssh2_session_last_error(session, &errmsg, &errlen, 0);
-        log_error("[C++ STEP 32 ERROR] SSH authentication failed: %.*s", errlen, errmsg);
-        libssh2_session_disconnect(session, "Authentication failed");
-        libssh2_session_free(session);
-        close(sock);
-        libssh2_exit();
-        napi_throw_error(env, nullptr, "Authentication failed");
-        return nullptr;
+        error = last_session_error(session, "Authentication failed");
+        log_error("SSH authentication failed: %s", error.c_str());
+        cleanup_open_failure(session, nullptr, sock, "Authentication failed");
+        return -1;
     }
 
-    log_info("[C++ STEP 33] SSH authentication successful for user %s", user.c_str());
-    log_info("[C++ STEP 34] Opening SSH channel...");
-
-    // Open channel
     LIBSSH2_CHANNEL *channel = libssh2_channel_open_session(session);
     if (!channel) {
-        char *errmsg;
-        int errlen;
-        libssh2_session_last_error(session, &errmsg, &errlen, 0);
-        log_error("[C++ STEP 35 ERROR] Failed to open SSH channel: %.*s", errlen, errmsg);
-        libssh2_session_disconnect(session, "Failed to open channel");
-        libssh2_session_free(session);
-        close(sock);
-        libssh2_exit();
-        napi_throw_error(env, nullptr, "Failed to open channel");
-        return nullptr;
+        error = last_session_error(session, "Failed to open channel");
+        log_error("Failed to open SSH channel: %s", error.c_str());
+        cleanup_open_failure(session, nullptr, sock, "Failed to open channel");
+        return -1;
     }
 
-    log_info("[C++ STEP 36] SSH channel opened");
-    log_info("[C++ STEP 37] Requesting PTY...");
-
-    // Request PTY
     if (libssh2_channel_request_pty(channel, "vt100")) {
-        char *errmsg;
-        int errlen;
-        libssh2_session_last_error(session, &errmsg, &errlen, 0);
-        log_error("[C++ STEP 38 ERROR] Failed to request PTY: %.*s", errlen, errmsg);
-        libssh2_channel_free(channel);
-        libssh2_session_disconnect(session, "Failed to request PTY");
-        libssh2_session_free(session);
-        close(sock);
-        libssh2_exit();
-        napi_throw_error(env, nullptr, "Failed to request PTY");
-        return nullptr;
+        error = last_session_error(session, "Failed to request PTY");
+        log_error("Failed to request PTY: %s", error.c_str());
+        cleanup_open_failure(session, channel, sock, "Failed to request PTY");
+        return -1;
     }
 
-    log_info("[C++ STEP 39] PTY requested successfully");
-    log_info("[C++ STEP 40] Starting shell...");
-
-    // Start shell
     if (libssh2_channel_shell(channel)) {
-        char *errmsg;
-        int errlen;
-        libssh2_session_last_error(session, &errmsg, &errlen, 0);
-        log_error("[C++ STEP 41 ERROR] Failed to start shell: %.*s", errlen, errmsg);
-        libssh2_channel_free(channel);
-        libssh2_session_disconnect(session, "Failed to start shell");
-        libssh2_session_free(session);
-        close(sock);
-        libssh2_exit();
-        napi_throw_error(env, nullptr, "Failed to start shell");
-        return nullptr;
+        error = last_session_error(session, "Failed to start shell");
+        log_error("Failed to start shell: %s", error.c_str());
+        cleanup_open_failure(session, channel, sock, "Failed to start shell");
+        return -1;
     }
 
-    log_info("[C++ STEP 42] SSH shell started successfully");
-    log_info("[C++ STEP 43] Creating session object...");
-
-    // Create session object
     KesshSession* kessh_session = new KesshSession{session, channel, sock, 0};
-    
+
     std::lock_guard<std::mutex> lock(session_mutex);
     int session_id = next_session_id++;
     sessions[session_id] = kessh_session;
 
-    log_info("[C++ STEP 44] SSH session created with ID: %d", session_id);
-    log_info("[C++ STEP 45] Preparing return value...");
+    log_info("SSH session created with ID: %d", session_id);
+    return session_id;
+}
+
+struct OpenSessionAsyncData {
+    napi_async_work work;
+    napi_deferred deferred;
+    std::string host;
+    int32_t port;
+    std::string user;
+    std::string pass;
+    std::string error;
+    int32_t session_id;
+};
+
+static bool parse_open_session_args(napi_env env, napi_callback_info info, std::string &host, int32_t &port, std::string &user, std::string &pass)
+{
+    size_t argc = 4;
+    napi_value args[4];
+    napi_status status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+
+    if (status != napi_ok || argc != 4) {
+        napi_throw_error(env, nullptr, "Invalid arguments");
+        return false;
+    }
+    if (args[0] == nullptr || args[1] == nullptr || args[2] == nullptr || args[3] == nullptr) {
+        napi_throw_error(env, nullptr, "Null argument detected");
+        return false;
+    }
+
+    host = get_string_arg(env, args[0]);
+    napi_get_value_int32(env, args[1], &port);
+    user = get_string_arg(env, args[2]);
+    pass = get_string_arg(env, args[3]);
+    return true;
+}
+
+napi_value OpenSession(napi_env env, napi_callback_info info) {
+    std::string host;
+    std::string user;
+    std::string pass;
+    int32_t port = 0;
+    if (!parse_open_session_args(env, info, host, port, user, pass)) {
+        return nullptr;
+    }
+
+    std::string error;
+    int32_t session_id = open_session_internal(host, port, user, pass, error);
+    if (session_id <= 0) {
+        napi_throw_error(env, nullptr, error.empty() ? "Failed to open SSH session" : error.c_str());
+        return nullptr;
+    }
 
     napi_value return_value;
     napi_create_int32(env, session_id, &return_value);
-    
-    log_info("[C++ STEP 46] OpenSession completed successfully, returning %d", session_id);
     return return_value;
+}
+
+static void ExecuteOpenSessionAsync(napi_env env, void *data)
+{
+    OpenSessionAsyncData *async_data = static_cast<OpenSessionAsyncData*>(data);
+    async_data->session_id = open_session_internal(
+        async_data->host,
+        async_data->port,
+        async_data->user,
+        async_data->pass,
+        async_data->error
+    );
+}
+
+static void CompleteOpenSessionAsync(napi_env env, napi_status status, void *data)
+{
+    OpenSessionAsyncData *async_data = static_cast<OpenSessionAsyncData*>(data);
+    napi_value result;
+    if (status != napi_ok) {
+        napi_create_int32(env, -1, &result);
+    } else {
+        napi_create_int32(env, async_data->session_id, &result);
+    }
+    if (async_data->session_id <= 0 && !async_data->error.empty()) {
+        log_error("OpenSessionAsync failed: %s", async_data->error.c_str());
+    }
+    napi_resolve_deferred(env, async_data->deferred, result);
+    napi_delete_async_work(env, async_data->work);
+    delete async_data;
+}
+
+napi_value OpenSessionAsync(napi_env env, napi_callback_info info)
+{
+    std::string host;
+    std::string user;
+    std::string pass;
+    int32_t port = 0;
+    if (!parse_open_session_args(env, info, host, port, user, pass)) {
+        return nullptr;
+    }
+
+    napi_value promise;
+    napi_deferred deferred;
+    napi_create_promise(env, &deferred, &promise);
+
+    OpenSessionAsyncData *async_data = new OpenSessionAsyncData{
+        nullptr,
+        deferred,
+        host,
+        port,
+        user,
+        pass,
+        "",
+        -1
+    };
+
+    napi_value resource_name;
+    napi_create_string_utf8(env, "OpenSessionAsync", NAPI_AUTO_LENGTH, &resource_name);
+    napi_status work_status = napi_create_async_work(
+        env,
+        nullptr,
+        resource_name,
+        ExecuteOpenSessionAsync,
+        CompleteOpenSessionAsync,
+        async_data,
+        &async_data->work
+    );
+    if (work_status != napi_ok) {
+        napi_value result;
+        napi_create_int32(env, -1, &result);
+        napi_resolve_deferred(env, deferred, result);
+        delete async_data;
+        return promise;
+    }
+
+    work_status = napi_queue_async_work(env, async_data->work);
+    if (work_status != napi_ok) {
+        napi_delete_async_work(env, async_data->work);
+        napi_value result;
+        napi_create_int32(env, -1, &result);
+        napi_resolve_deferred(env, deferred, result);
+        delete async_data;
+    }
+    return promise;
 }
 
 napi_value CloseSession(napi_env env, napi_callback_info info) {
@@ -725,9 +798,16 @@ napi_value DownloadFile(napi_env env, napi_callback_info info) {
     }
 
     KesshSession* kessh_session = it->second;
-    
+
+    std::string quoted_path;
+    std::string quote_error;
+    if (!shell_quote_arg(remote_path, quoted_path, quote_error)) {
+        napi_throw_error(env, nullptr, quote_error.c_str());
+        return nullptr;
+    }
+
     // 使用cat命令读取文件
-    std::string command = "cat \"" + remote_path + "\" 2>&1";
+    std::string command = "cat -- " + quoted_path + " 2>&1";
     LIBSSH2_CHANNEL *channel = libssh2_channel_open_session(kessh_session->session);
     
     if (!channel) {
@@ -801,12 +881,17 @@ napi_value UploadFile(napi_env env, napi_callback_info info) {
     }
 
     KesshSession* kessh_session = it->second;
-    
-    // 使用临时文件和base64编码传输
-    // 先创建临时文件，然后写入内容
-    std::string temp_file = "/tmp/kessh_upload_" + std::to_string(time(nullptr));
-    std::string command = "cat > \"" + remote_path + "\"";
-    
+
+    std::string quoted_path;
+    std::string quote_error;
+    if (!shell_quote_arg(remote_path, quoted_path, quote_error)) {
+        napi_throw_error(env, nullptr, quote_error.c_str());
+        return nullptr;
+    }
+
+    // 使用cat命令写入文件
+    std::string command = "cat > " + quoted_path;
+
     LIBSSH2_CHANNEL *channel = libssh2_channel_open_session(kessh_session->session);
     
     if (!channel) {
@@ -1106,6 +1191,7 @@ static napi_value Init(napi_env env, napi_value exports)
     
     napi_property_descriptor desc[] = {
         { "openSession", nullptr, OpenSession, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "openSessionAsync", nullptr, OpenSessionAsync, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "closeSession", nullptr, CloseSession, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "setKeepaliveConfig", nullptr, SetKeepaliveConfig, nullptr, nullptr, nullptr, napi_default, nullptr },
         { "sendKeepalive", nullptr, SendKeepalive, nullptr, nullptr, nullptr, napi_default, nullptr },
