@@ -8,9 +8,22 @@ import { router } from '@kit.ArkUI';
  *   `entry/src/main/resources/rawfile/main.lynx.bundle`
  * (see `lynx-app/README.md` for the build / copy command).
  *
- * Once `@lynx/lynx@next` is installed via `ohpm install`, the import below
- * resolves to the LynxView ArkUI component. While the bundle is missing
- * the page renders a friendly fallback so the app still launches.
+ * Once `@lynx/lynx@next` is installed via `ohpm install`, replace the
+ * placeholder Column below with:
+ *
+ *   import { LynxView } from '@lynx/lynx';
+ *
+ *   LynxView({ url: $rawfile('main.lynx.bundle') })
+ *     .width('100%')
+ *     .layoutWeight(1)
+ *     .onError((event: { message: string }) => {
+ *       this.bundleAvailable = false;
+ *       this.errorMessage = event.message;
+ *     })
+ *
+ * The KesshHost NativeModule is registered in `EntryAbility.onCreate`. When
+ * `@lynx/lynx@next` is wired up the ReactLynx side calls it via
+ * `NativeModules.KesshHost`.
  */
 
 @Entry
@@ -21,45 +34,24 @@ struct LynxHostPage {
 
   build() {
     Column() {
-      // The ArkUI side keeps a thin top bar so the user can leave the Lynx
-      // sub-app and return to legacy ArkTS pages while the migration is in
-      // progress. Once every page is migrated, this header can be removed
-      // and `LynxHostPage` becomes the entry page directly.
-      Row() {
-        Text('< 返回 ArkUI 主界面')
-          .fontSize(14)
-          .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-          .onClick((): void => { router.back(); })
-        Blank().layoutWeight(1)
-      }
-      .width('100%')
-
       if (this.bundleAvailable) {
-        // NOTE: LynxView is provided by the @lynx/lynx@next ohpm package.
-        // After running `ohpm install` in `Application/` the import below
-        // becomes available. Until then this branch is rendered as a
-        // friendly placeholder rather than crashing the app.
-        //
-        // import { LynxView } from '@lynx/lynx';
-        //
-        // LynxView({
-        //   url: $rawfile('main.lynx.bundle')
-        // })
-        //   .width('100%')
-        //   .layoutWeight(1)
-        //   .onError((event: { message: string }) => {
-        //     this.bundleAvailable = false;
-        //     this.errorMessage = event.message;
-        //   })
         Column() {
-          Text('Lynx UI placeholder')
+          Text('Lynx UI 占位')
             .fontSize(20)
             .fontWeight(FontWeight.Medium)
             .margin({ bottom: 8 })
-          Text('当前 ArkUI 占位实现。请先在 lynx-app/ 中运行 pnpm build 并将 dist/main.lynx.bundle 复制到 entry/src/main/resources/rawfile/，再启用上方注释中的 LynxView 调用。')
+          Text('当前位置已切换为 Lynx UI 入口。请在 lynx-app/ 中运行 npm run build 并把 dist/main.lynx.bundle 复制到 entry/src/main/resources/rawfile/，然后启用 LynxView 调用即可看到 ReactLynx 页面。')
             .fontSize(13)
             .fontColor($r('sys.color.ohos_id_color_text_secondary'))
             .textAlign(TextAlign.Center)
+            .lineHeight(20)
+          Button('使用 ArkUI 旧界面')
+            .type(ButtonType.Capsule)
+            .height(40)
+            .margin({ top: 16 })
+            .onClick((): void => {
+              router.replaceUrl({ url: 'pages/Index' });
+            })
         }
         .width('100%')
         .layoutWeight(1)
@@ -76,9 +68,12 @@ struct LynxHostPage {
             .fontColor($r('sys.color.ohos_id_color_text_secondary'))
             .margin({ top: 8 })
             .textAlign(TextAlign.Center)
-          Button('返回 ArkUI 界面')
+          Button('回到 ArkUI 旧界面')
+            .type(ButtonType.Capsule)
             .margin({ top: 16 })
-            .onClick((): void => { router.back(); })
+            .onClick((): void => {
+              router.replaceUrl({ url: 'pages/Index' });
+            })
         }
         .width('100%')
         .layoutWeight(1)

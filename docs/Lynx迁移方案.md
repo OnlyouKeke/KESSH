@@ -38,43 +38,44 @@ KESSH 现状是一个 HarmonyOS Stage 应用，UI 全部使用 ArkTS（`.ets`）
 ## 3. 已完成
 
 - `Application/oh-package.json5` 中 `@lynx/lynx*`、`@lynx/primjs` 升级到 `next`。
-- 新增 `lynx-app/` ReactLynx 子工程，使用 Rspeedy 构建：
-  - `lynx-app/package.json`
-  - `lynx-app/lynx.config.ts`
-  - `lynx-app/tsconfig.json`
-  - `lynx-app/src/styles/theme.css`（基于 `@lynx-js/luna-styles`，提供 `lunaris-dark` / `luna-light`）
-  - `lynx-app/src/native/host.ts`：与 HarmonyOS 壳交互的 `NativeModules` 桥接定义。
-  - `lynx-app/src/native/hooks.ts`：异步加载 hosts/snippets/keys/logs 的 React Hook。
-  - `lynx-app/src/navigation/Navigator.tsx`：轻量页面栈，对齐现有 `router.pushUrl({ url })` 调用习惯。
-  - `lynx-app/src/components/Page.tsx`：复用的 `PageHeader / Card / EmptyState / PrimaryAction`。
-  - `lynx-app/src/App.tsx`：底部 Tab 容器（资产 / 连接 / 设置）。
-- 已迁移到 ReactLynx + lynx-ui 的页面骨架：
-  - `HistoryPage`（资产首页 + 最近连接）
-  - `HostListPage`（主机列表）
-  - `AddHostPage`（添加主机 / 补密码，使用 lynx-ui `Input` + `KeyboardAware*`）
-  - `SettingsPage`（深色模式、保存密码 Switch + 设置子项入口）
-  - `SnippetsPage`（代码片段列表 + 添加 + 删除）
-  - `TerminalPage`（异步 openSession + termRead 轮询 + keepalive，对接 `KesshHost`）
-- `Application/entry/src/main/ets/pages/LynxHostPage.ets`：HarmonyOS 壳页面。当 `main.lynx.bundle` 不在 `rawfile/` 时显示占位文案；启用注释中的 `LynxView` 调用即接入 Lynx 渲染。
-- `pages/SettingsPage.ets` 增加 `使用 Lynx UI（实验）` 入口跳转到 `LynxHostPage`。
-- `main_pages.json` 注册 `pages/LynxHostPage`。
+- 新增 `lynx-app/` ReactLynx 子工程（Rspeedy + `@lynx-js/lynx-ui` + `@lynx-js/luna-styles`）：
+  - 构建：`package.json` / `lynx.config.ts` / `tsconfig.json`
+  - 主题：`src/styles/theme.css`，基于 Luna tokens（`canvas / paper / content / primary / line` 等），支持 `lunaris-dark` / `luna-light`。
+  - 桥接：`src/native/host.ts` 定义 `KesshHost` NativeModule 契约（设置、连接、片段、密钥、SSH、SFTP、监控、日志、剪贴板、网络工具、toast）。
+  - Hooks：`src/native/hooks.ts`。
+  - 路由：`src/navigation/Navigator.tsx` 支持全部 21 个路由。
+  - 复用：`src/components/Page.tsx`（PageHeader / Card / EmptyState / PrimaryAction / SectionTitle）。
+  - 主壳：`src/App.tsx` 三 Tab（资产 / 连接 / 设置）+ 路由分发。
+- 全部 ReactLynx 页面（21 个）：
+  - 资产：`HistoryPage` / `HostListPage` / `SnippetsPage` / `SettingsKeysPage`
+  - 连接：`AddHostPage` / `TerminalPage` / `SFTPPage` / `SCPPage` / `MonitorPage`
+  - 设置：`SettingsPage` / `SettingsKeysPage` / `SettingsSessionPage` / `SettingsTerminalFontPage` / `SettingsLogsPage`
+  - 工具：`ToolsIndexPage` / `PingToolPage` / `PortTestPage` / `Base64ToolPage` / `SubnetCalcPage`
+  - 法律 / 反馈：`PrivacyPolicyPage` / `UserAgreementPage` / `FeedbackPage`
+  - 调试：`WebSocketTestPage` / `WebSocketSSHTestPage`
+- HarmonyOS 端 `Application/entry/src/main/ets/kessh/KesshHost.ets` 实现了 `lynx-app/src/native/host.ts` 中声明的全部桥接方法，封装 `ConnectionStore / SnippetStore / KeyStore / SettingsStore / Logger / SSHEngine / kessh.so`。
+- `EntryAbility.onCreate` 实例化 `KesshHost.shared()`，并把入口页改为 `pages/LynxHostPage`。
+- `LynxHostPage.ets` 在 `LynxView` 接入前显示占位文案，可通过按钮回到 ArkUI 旧界面，支持回退到 `pages/Index`。
+- `main_pages.json` 把 `pages/LynxHostPage` 排在首位，旧 ArkTS 页面保留作为兜底。
 
-## 4. 还没做（按建议顺序）
+## 4. 还需做的
 
-1. **HarmonyOS 壳实现 `KesshHost` NativeModule**，把现有 `ConnectionStore / SnippetStore / KeyStore / SettingsStore / SSHEngine / Logger` 的能力以 `@lynx/lynx@next` 提供的 NativeModule 注册接口暴露给 Lynx：
-   - `getSettings / setDarkMode / setSavePassword / setSessionSettings`
-   - `listConnections / addConnection / savePassword / hasPassword`
-   - `listSnippets / addSnippet / removeSnippet`
-   - `listKeys`
-   - `openSession / closeSession / termWrite / termRead / sendKeepalive / listFiles`
-   - `listLogs / clearLogs`
-   - `showToast`
-   - 接口定义：`lynx-app/src/native/host.ts`。
-2. **打通构建-集成流水线**：在 `lynx-app/` 跑 `pnpm build`，把 `dist/main.lynx.bundle` 复制到 `Application/entry/src/main/resources/rawfile/main.lynx.bundle`；在 `LynxHostPage.ets` 中启用注释里的 `LynxView` 代码（删除 `bundleAvailable` 占位分支）。
-3. **补齐剩余页面**（`lynx-app/README.md` 已有完整列表）：SFTPPage、Monitor、SCPPage、SettingsKeys、SettingsLogs、SettingsSession、SettingsTerminalFont、tools/*、PrivacyPolicy、UserAgreement、Feedback、WebSocket 测试页。每个页面按既有骨架方式新增，不要再改 ArkTS 页面。
-4. **逐步去掉 ArkTS 页面**：当某个页面在 Lynx 侧达到等价或更好的体验后，把 `Application/entry/src/main/resources/base/profile/main_pages.json` 中对应路由从 ArkTS 切到 `LynxHostPage`，同时删除旧 `.ets` 文件（除了 `EntryAbility`、`LynxHostPage`、`SCPPage`/`Monitor` 等还需要 ArkUI 原生能力的页面）。
-5. **样式打磨**：把 `Application/entry/src/main/ets/common/LynxTheme.ets` 中的色板对齐到 Luna tokens（`canvas / paper / content / primary / line`），让 ArkTS 残留页面与 Lynx 页面视觉一致。
-6. **签名/构建**：升级 `@lynx/lynx@next` 后第一次 `ohpm install` 可能需要刷新 lock 文件；在 DevEco Studio 中跑 hvigor assembleHap 验证。
+1. **接入 `LynxView` 实例**：在 `lynx-app/` 跑 `npm install && npm run build`，把 `dist/main.lynx.bundle` 复制到 `Application/entry/src/main/resources/rawfile/main.lynx.bundle`，然后把 `LynxHostPage.ets` 中占位 `Column` 替换为：
+   ```ts
+   import { LynxView } from '@lynx/lynx';
+   LynxView({ url: $rawfile('main.lynx.bundle') })
+     .width('100%')
+     .layoutWeight(1)
+     .onError((event) => { /* ... */ })
+   ```
+2. **注册 NativeModule**：在 `EntryAbility.onCreate()` 注释处启用：
+   ```ts
+   import lynx from '@lynx/lynx';
+   lynx.registerNativeModule('KesshHost', KesshHost.shared());
+   ```
+   具体方法名以 `@lynx/lynx@next` HarmonyOS SDK 文档为准。
+3. **删除旧 ArkTS 页面**：在 Lynx 侧通过线上验证后，按 `lynx-app/README.md` 表逐个删除对应 `.ets` 文件，并从 `main_pages.json` 中移除路由。
+4. **签名 / 构建**：升级 `@lynx/lynx@next` 后第一次 `ohpm install` 可能需要刷新 `oh-package-lock.json5`；在 DevEco Studio 中跑 `hvigor assembleHap` 验证。
 
 ## 5. 本地运行流程
 

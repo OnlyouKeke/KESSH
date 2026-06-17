@@ -62,29 +62,41 @@ cp dist/main.lynx.bundle ../Application/entry/src/main/resources/rawfile/main.ly
 
 ## Migration status
 
-The HarmonyOS ArkTS pages are still the production UI; this folder is the
-new UI that progressively replaces them.
+The HarmonyOS app's primary entry is now `pages/LynxHostPage`, which loads
+`main.lynx.bundle` built from this folder. The legacy ArkTS pages remain
+behind that bundle as a fallback for environments where the bundle is
+missing.
 
 | HarmonyOS page (ArkTS) | Lynx replacement | Status |
 |---|---|---|
-| `pages/Index.ets` | `src/App.tsx` | ✅ skeleton |
-| `pages/HistoryPage.ets` | `src/pages/HistoryPage.tsx` | ✅ skeleton |
-| `pages/HostList.ets` | `src/pages/HostListPage.tsx` | ✅ skeleton |
-| `pages/AddHost.ets` | `src/pages/AddHostPage.tsx` | ✅ skeleton |
-| `pages/SettingsPage.ets` | `src/pages/SettingsPage.tsx` | ✅ skeleton |
-| `pages/Terminal.ets` | `src/pages/TerminalPage.tsx` | ⏳ shell + native bridge stubbed |
-| `pages/SFTPPage.ets` | `src/pages/SFTPPage.tsx` | ⏳ TODO |
-| `pages/Snippets.ets` | `src/pages/SnippetsPage.tsx` | ⏳ TODO |
-| `pages/SettingsKeys.ets` | `src/pages/SettingsKeysPage.tsx` | ⏳ TODO |
-| `pages/SettingsLogs.ets` | `src/pages/SettingsLogsPage.tsx` | ⏳ TODO |
-| `pages/SettingsSession.ets` | `src/pages/SettingsSessionPage.tsx` | ⏳ TODO |
-| `pages/SettingsTerminalFont.ets` | `src/pages/SettingsTerminalFontPage.tsx` | ⏳ TODO |
-| `pages/Monitor.ets` | `src/pages/MonitorPage.tsx` | ⏳ TODO |
-| `pages/SCPPage.ets` | `src/pages/SCPPage.tsx` | ⏳ TODO |
-| `pages/tools/*` | `src/pages/tools/*` | ⏳ TODO |
+| `pages/Index.ets` | `src/App.tsx` (3-tab shell) | ✅ |
+| `pages/HistoryPage.ets` | `src/pages/HistoryPage.tsx` | ✅ |
+| `pages/HostList.ets` | `src/pages/HostListPage.tsx` | ✅ |
+| `pages/AddHost.ets` | `src/pages/AddHostPage.tsx` | ✅ |
+| `pages/SettingsPage.ets` | `src/pages/SettingsPage.tsx` | ✅ |
+| `pages/Terminal.ets` | `src/pages/TerminalPage.tsx` | ✅ |
+| `pages/SFTPPage.ets` | `src/pages/SFTPPage.tsx` | ✅ |
+| `pages/Snippets.ets` | `src/pages/SnippetsPage.tsx` | ✅ |
+| `pages/SettingsKeys.ets` | `src/pages/SettingsKeysPage.tsx` | ✅ |
+| `pages/SettingsLogs.ets` | `src/pages/SettingsLogsPage.tsx` | ✅ |
+| `pages/SettingsSession.ets` | `src/pages/SettingsSessionPage.tsx` | ✅ |
+| `pages/SettingsTerminalFont.ets` | `src/pages/SettingsTerminalFontPage.tsx` | ✅ |
+| `pages/Monitor.ets` | `src/pages/MonitorPage.tsx` | ✅ |
+| `pages/SCPPage.ets` | `src/pages/SCPPage.tsx` | ✅ |
+| `pages/PrivacyPolicy.ets` | `src/pages/PrivacyPolicyPage.tsx` | ✅ |
+| `pages/UserAgreement.ets` | `src/pages/UserAgreementPage.tsx` | ✅ |
+| `pages/Feedback.ets` | `src/pages/FeedbackPage.tsx` | ✅ |
+| `pages/WebSocketTestPage.ets` | `src/pages/WebSocketTestPage.tsx` | ✅ |
+| `pages/WebSocketSSHTestPage.ets` | `src/pages/WebSocketSSHTestPage.tsx` | ✅ |
+| `pages/tools/PingTool.ets` | `src/pages/PingToolPage.tsx` | ✅ |
+| `pages/tools/PortTest.ets` | `src/pages/PortTestPage.tsx` | ✅ |
+| `pages/tools/Base64Tool.ets` | `src/pages/Base64ToolPage.tsx` | ✅ |
+| `pages/tools/SubnetCalc.ets` | `src/pages/SubnetCalcPage.tsx` | ✅ |
+| `src/pages/SSHNewPage` (connect tab body) | inlined into `App.tsx` `ConnectTab` | ✅ |
 
-Each remaining page should be migrated as a small focused PR following the
-same shape as the seed pages already in `src/pages/`.
+After every page is verified visually inside `LynxView`, the corresponding
+ArkTS page can be deleted. `pages/Index.ets` stays as a fallback entry until
+the Lynx bundle is fully validated on every supported ABI.
 
 ## Component conventions
 

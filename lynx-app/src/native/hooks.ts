@@ -4,16 +4,10 @@ import { KesshHost } from './host';
 import type {
   AppSettings,
   ConnectionRecord,
+  FontOption,
   ImportedKey,
   Snippet
 } from './host';
-
-/**
- * Lightweight React hooks that wrap the host bridge so screens never call
- * NativeModules directly. They keep the loading/error shape consistent and
- * make the migration mechanical: any HarmonyOS ArkTS page that read from a
- * static Store class becomes a React page that reads from a hook.
- */
 
 interface AsyncResult<T> {
   data: T | null;
@@ -73,4 +67,8 @@ export function useKeys(): AsyncResult<ImportedKey[]> {
 
 export function useLogs(): AsyncResult<string[]> {
   return useAsync(() => KesshHost.listLogs());
+}
+
+export function useFontOptions(): AsyncResult<FontOption[]> {
+  return useAsync(() => KesshHost.listFontOptions());
 }

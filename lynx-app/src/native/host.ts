@@ -2,16 +2,9 @@
  * Native bridge between the ReactLynx UI and the HarmonyOS host.
  *
  * The HarmonyOS shell registers a `KesshHost` NativeModule that exposes the
- * SSH operations (currently provided by `Application/entry/src/main/cpp/kessh.cpp`)
- * and a small storage / settings layer (currently `Stores.ets`).
- *
- * On the Lynx side, `NativeModules` is the standard background-only access
- * point. Calls return Promises so the UI can stay responsive.
- *
- * This module is the single source of truth for the Lynx → host contract.
- * If a method does not exist on the host yet, it falls back to a stub that
- * surfaces a clear "not implemented" error so the UI fails closed instead of
- * silently doing the wrong thing.
+ * SSH operations, settings, storage, and network tools to Lynx. All calls
+ * are async; if the host has not yet bridged a method the stub fails closed
+ * with an obvious error, never silently.
  */
 
 'background only';
@@ -67,10 +60,24 @@ export interface AppSettings {
   session: SessionSettings;
 }
 
+export interface FontOption {
+  key: string;
+  label: string;
+  description: string;
+  family: string;
+}
+
+export interface SystemMetrics {
+  cpuUsage: number;
+  cpuDetail: string;
+  memoryUsage: number;
+  memoryDetail: string;
+  diskUsage: number;
+  diskDetail: string;
+  lastUpdate: string;
+}
+
 const HOST = (() => {
-  // NativeModules can be undefined when running in the dev preview.
-  // Fall back to no-op stubs so the UI still renders and the developer sees
-  // the "not bridged yet" error in console.
   try {
     return NativeModules?.KesshHost ?? null;
   } catch {
@@ -106,6 +113,9 @@ export const KesshHost = {
   async setSessionSettings(settings: Partial<SessionSettings>): Promise<void> {
     return call<void>('setSessionSettings', [settings]);
   },
+  async listFontOptions(): Promise<FontOption[]> {
+    return call<FontOption[]>('listFontOptions');
+  },
 
   // Connection store --------------------------------------------------
   async listConnections(): Promise<ConnectionRecord[]> {
@@ -136,6 +146,12 @@ export const KesshHost = {
   async listKeys(): Promise<ImportedKey[]> {
     return call<ImportedKey[]>('listKeys');
   },
+  async importKey(name: string, content: string, publicKey?: string, passphrase?: string): Promise<ImportedKey> {
+    return call<ImportedKey>('importKey', [name, content, publicKey, passphrase]);
+  },
+  async removeKey(id: number): Promise<void> {
+    return call<void>('removeKey', [id]);
+  },
 
   // SSH ---------------------------------------------------------------
   async openSession(draft: ConnectionDraft): Promise<number> {
@@ -156,6 +172,17 @@ export const KesshHost = {
   async listFiles(sessionId: number, remotePath: string): Promise<string> {
     return call<string>('listFiles', [sessionId, remotePath]);
   },
+  async downloadFile(sessionId: number, remotePath: string): Promise<string> {
+    return call<string>('downloadFile', [sessionId, remotePath]);
+  },
+  async uploadFile(sessionId: number, remotePath: string, content: string): Promise<number> {
+    return call<number>('uploadFile', [sessionId, remotePath, content]);
+  },
+
+  // Monitor / metrics -------------------------------------------------
+  async fetchMetrics(sessionId: number): Promise<SystemMetrics> {
+    return call<SystemMetrics>('fetchMetrics', [sessionId]);
+  },
 
   // Logs --------------------------------------------------------------
   async listLogs(): Promise<string[]> {
@@ -168,11 +195,19 @@ export const KesshHost = {
   // Toast / prompt ----------------------------------------------------
   async showToast(message: string): Promise<void> {
     return call<void>('showToast', [message]);
+  },
+  async writeClipboard(text: string): Promise<void> {
+    return call<void>('writeClipboard', [text]);
+  },
+
+  // Network tools -----------------------------------------------------
+  async pingHost(host: string, count: number): Promise<string> {
+    return call<string>('pingHost', [host, count]);
+  },
+  async testPort(host: string, port: number, timeoutMs: number): Promise<string> {
+    return call<string>('testPort', [host, port, timeoutMs]);
   }
 };
 
 export type LucideName = string;
-
-// Re-export the type used by render-prop children of lynx-ui Button/Switch
-// so pages do not import from internal paths.
 export type { ReactNode };

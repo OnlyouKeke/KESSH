@@ -1,9 +1,8 @@
 /**
  * Tiny in-bundle navigation. ReactLynx does not ship a router by default, and
- * we do not want a heavyweight one for ~15 pages. This implementation maps the
- * existing HarmonyOS `router.pushUrl({ url: 'pages/X' })` calls 1-to-1 onto
- * a stack of route entries, so any page can call `navigate('Terminal')` and
- * the App shell renders the matching page.
+ * we do not want a heavyweight one for ~20 pages. This implementation maps
+ * the existing HarmonyOS `router.pushUrl({ url: 'pages/X' })` calls 1-to-1
+ * onto a stack of route entries.
  */
 
 import { createContext, useCallback, useContext, useMemo, useState } from '@lynx-js/react';
@@ -23,7 +22,17 @@ export type RouteName =
   | 'Terminal'
   | 'SFTPPage'
   | 'Monitor'
-  | 'SCPPage';
+  | 'SCPPage'
+  | 'PrivacyPolicy'
+  | 'UserAgreement'
+  | 'Feedback'
+  | 'Tools'
+  | 'PingTool'
+  | 'PortTest'
+  | 'Base64Tool'
+  | 'SubnetCalc'
+  | 'WebSocketTest'
+  | 'WebSocketSSHTest';
 
 export interface RouteEntry {
   name: RouteName;
